@@ -16,11 +16,11 @@ import (
 
 	"io"
 
-	"github.com/sirupsen/logrus"
 	"github.com/grpc-ecosystem/go-grpc-middleware"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/logrus"
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags"
 	pb_testproto "github.com/grpc-ecosystem/go-grpc-middleware/testing/testproto"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"
@@ -40,28 +40,37 @@ func TestLogrusPayloadSuite(t *testing.T) {
 		t.Skipf("Skipping due to json.RawMessage incompatibility with go1.7")
 		return
 	}
-	alwaysLoggingDeciderServer := func(ctx context.Context, fullMethodName string, servingObject interface{}) bool { return true }
-	alwaysLoggingDeciderClient := func(ctx context.Context, fullMethodName string) bool { return true }
+
 	b := newLogrusBaseSuite(t)
-	b.InterceptorTestSuite.ClientOpts = []grpc.DialOption{
-		grpc.WithUnaryInterceptor(grpc_logrus.PayloadUnaryClientInterceptor(logrus.NewEntry(b.logger), alwaysLoggingDeciderClient)),
-		grpc.WithStreamInterceptor(grpc_logrus.PayloadStreamClientInterceptor(logrus.NewEntry(b.logger), alwaysLoggingDeciderClient)),
-	}
-	b.InterceptorTestSuite.ServerOpts = []grpc.ServerOption{
-		grpc_middleware.WithStreamServerChain(
-			grpc_ctxtags.StreamServerInterceptor(grpc_ctxtags.WithFieldExtractor(grpc_ctxtags.CodeGenRequestFieldExtractor)),
-			grpc_logrus.StreamServerInterceptor(logrus.NewEntry(nullLogger)),
-			grpc_logrus.PayloadStreamServerInterceptor(logrus.NewEntry(b.logger), alwaysLoggingDeciderServer)),
-		grpc_middleware.WithUnaryServerChain(
-			grpc_ctxtags.UnaryServerInterceptor(grpc_ctxtags.WithFieldExtractor(grpc_ctxtags.CodeGenRequestFieldExtractor)),
-			grpc_logrus.UnaryServerInterceptor(logrus.NewEntry(nullLogger)),
-			grpc_logrus.PayloadUnaryServerInterceptor(logrus.NewEntry(b.logger), alwaysLoggingDeciderServer)),
-	}
-	suite.Run(t, &logrusPayloadSuite{b})
+	payloadSuite := &logrusPayloadSuite{b}
+	payloadSuite.buildInterceptors(logrus.InfoLevel)
+	suite.Run(t, payloadSuite)
 }
 
 type logrusPayloadSuite struct {
 	*logrusBaseSuite
+}
+
+func (s *logrusPayloadSuite) buildInterceptors(payloadLogLevel logrus.Level) {
+	alwaysLoggingDeciderServer := func(ctx context.Context, fullMethodName string, servingObject interface{}) bool { return true }
+	alwaysLoggingDeciderClient := func(ctx context.Context, fullMethodName string) bool { return true }
+
+	entry := logrus.NewEntry(s.logger)
+	entry.Logger.Level = payloadLogLevel
+	s.InterceptorTestSuite.ClientOpts = []grpc.DialOption{
+		grpc.WithUnaryInterceptor(grpc_logrus.PayloadUnaryClientInterceptor(entry, alwaysLoggingDeciderClient)),
+		grpc.WithStreamInterceptor(grpc_logrus.PayloadStreamClientInterceptor(entry, alwaysLoggingDeciderClient)),
+	}
+	s.InterceptorTestSuite.ServerOpts = []grpc.ServerOption{
+		grpc_middleware.WithStreamServerChain(
+			grpc_ctxtags.StreamServerInterceptor(grpc_ctxtags.WithFieldExtractor(grpc_ctxtags.CodeGenRequestFieldExtractor)),
+			grpc_logrus.StreamServerInterceptor(logrus.NewEntry(nullLogger)),
+			grpc_logrus.PayloadStreamServerInterceptor(entry, alwaysLoggingDeciderServer)),
+		grpc_middleware.WithUnaryServerChain(
+			grpc_ctxtags.UnaryServerInterceptor(grpc_ctxtags.WithFieldExtractor(grpc_ctxtags.CodeGenRequestFieldExtractor)),
+			grpc_logrus.UnaryServerInterceptor(logrus.NewEntry(nullLogger)),
+			grpc_logrus.PayloadUnaryServerInterceptor(entry, alwaysLoggingDeciderServer)),
+	}
 }
 
 func (s *logrusPayloadSuite) getServerAndClientMessages(expectedServer int, expectedClient int) (serverMsgs []string, clientMsgs []string) {
@@ -101,6 +110,25 @@ func (s *logrusPayloadSuite) TestPing_LogsBothRequestAndResponse() {
 	assert.Contains(s.T(), serverResp, `"grpc.response.content": {`, "response payload must be logged in a structured way")
 	assert.Contains(s.T(), serverResp, fmt.Sprintf(`"value": "%s"`, resp.Value))
 	assert.Contains(s.T(), serverResp, fmt.Sprintf(`"counter": %d`, resp.Counter))
+}
+
+func (s *logrusPayloadSuite) Test_ChangeLogLevel() {
+	verifyLevel := func(level string) {
+		_, err := s.Client.Ping(s.SimpleCtx(), goodPing)
+		assert.NoError(s.T(), err, "there must be not be an on a successful call")
+		serverMsgs, clientMsgs := s.getServerAndClientMessages(2, 2)
+		serverReq, serverResp := serverMsgs[0], serverMsgs[1]
+		clientReq, clientResp := clientMsgs[0], clientMsgs[1]
+		assert.Contains(s.T(), clientReq, fmt.Sprintf(`"level": "%s"`, level))
+		assert.Contains(s.T(), clientResp, fmt.Sprintf(`"level": "%s"`, level))
+		assert.Contains(s.T(), serverReq, fmt.Sprintf(`"level": "%s"`, level))
+		assert.Contains(s.T(), serverResp, fmt.Sprintf(`"level": "%s"`, level))
+	}
+
+	verifyLevel("info")
+	s.buildInterceptors(logrus.WarnLevel)
+	verifyLevel("warning")
+	s.buildInterceptors(logrus.InfoLevel)
 }
 
 func (s *logrusPayloadSuite) TestPingError_LogsOnlyRequestsOnError() {

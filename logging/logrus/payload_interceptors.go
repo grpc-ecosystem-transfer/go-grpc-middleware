@@ -8,10 +8,10 @@ import (
 
 	"fmt"
 
-	"github.com/sirupsen/logrus"
 	"github.com/golang/protobuf/jsonpb"
 	"github.com/golang/protobuf/proto"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
@@ -130,7 +130,7 @@ func (l *loggingServerStream) RecvMsg(m interface{}) error {
 
 func logProtoMessageAsJson(entry *logrus.Entry, pbMsg interface{}, key string, msg string) {
 	if p, ok := pbMsg.(proto.Message); ok {
-		entry.WithField(key, &jsonpbMarshalleble{p}).Info(msg)
+		levelLogf(entry.WithField(key, &jsonpbMarshalleble{p}), entry.Logger.Level, msg)
 	}
 }
 
