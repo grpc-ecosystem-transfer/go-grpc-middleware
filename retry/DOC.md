@@ -22,7 +22,7 @@ Other default options are: retry on `ResourceExhausted` and `Unavailable` gRPC c
 linear backoff with 10% jitter.
 
 For chained interceptors, the retry interceptor will call every interceptor that follows it
-whenever when a retry happens.
+whenever a retry happens.
 
 Please see examples for more advanced use.
 
