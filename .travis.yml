@@ -1,21 +1,15 @@
 sudo: false
 language: go
 go:
-  - 1.8.x
+- 1.11.4
 env:
-  - DEP_VERSION="0.3.2"
-
-before_install:
-  # Download the binary to bin folder in $GOPATH
-  - curl -L -s https://github.com/golang/dep/releases/download/v${DEP_VERSION}/dep-linux-amd64 -o $GOPATH/bin/dep
-  # Make the binary executable
-  - chmod +x $GOPATH/bin/dep
+- GO111MODULE=on
 
 install:
-  - dep ensure
+- go mod download
 
 script:
- - make test
- 
+- make test
+
 after_success:
-  - bash <(curl -s https://codecov.io/bash)
+- bash <(curl -s https://codecov.io/bash)
