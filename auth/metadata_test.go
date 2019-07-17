@@ -4,14 +4,14 @@
 package grpc_auth
 
 import (
+	"context"
 	"testing"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/util/metautils"
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/net/context"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 func TestAuthFromMD(t *testing.T) {
@@ -64,7 +64,7 @@ func TestAuthFromMD(t *testing.T) {
 		ctx := metautils.NiceMD(run.md).ToIncoming(context.TODO())
 		out, err := AuthFromMD(ctx, "bearer")
 		if run.errCode != codes.OK {
-			assert.Equal(t, run.errCode, grpc.Code(err), run.msg)
+			assert.Equal(t, run.errCode, status.Code(err), run.msg)
 		} else {
 			assert.NoError(t, err, run.msg)
 		}

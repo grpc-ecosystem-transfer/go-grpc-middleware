@@ -1,6 +1,7 @@
 package grpc_logrus_test
 
 import (
+	"context"
 	"time"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware"
@@ -9,7 +10,6 @@ import (
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags/logrus"
 	pb_testproto "github.com/grpc-ecosystem/go-grpc-middleware/testing/testproto"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
 

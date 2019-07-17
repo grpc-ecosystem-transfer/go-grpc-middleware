@@ -4,8 +4,9 @@
 package grpc_ctxtags
 
 import (
+	"context"
+
 	"github.com/grpc-ecosystem/go-grpc-middleware"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/peer"
 )
@@ -67,8 +68,8 @@ func (w *wrappedStream) RecvMsg(m interface{}) error {
 
 func newTagsForCtx(ctx context.Context) context.Context {
 	t := newTags()
-	if peer, ok := peer.FromContext(ctx); ok {
-		t.Set("peer.address", peer.Addr.String())
+	if p, ok := peer.FromContext(ctx); ok {
+		t.Set("peer.address", p.Addr.String())
 	}
 	return setInContext(ctx, t)
 }

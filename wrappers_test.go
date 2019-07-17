@@ -4,12 +4,13 @@
 package grpc_middleware
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func TestWrapServerStream(t *testing.T) {
@@ -34,7 +35,7 @@ func (f *fakeServerStream) Context() context.Context {
 
 func (f *fakeServerStream) SendMsg(m interface{}) error {
 	if f.sentMessage != nil {
-		return grpc.Errorf(codes.AlreadyExists, "fakeServerStream only takes one message, sorry")
+		return status.Errorf(codes.AlreadyExists, "fakeServerStream only takes one message, sorry")
 	}
 	f.sentMessage = m
 	return nil
@@ -42,7 +43,7 @@ func (f *fakeServerStream) SendMsg(m interface{}) error {
 
 func (f *fakeServerStream) RecvMsg(m interface{}) error {
 	if f.recvMessage == nil {
-		return grpc.Errorf(codes.NotFound, "fakeServerStream has no message, sorry")
+		return status.Errorf(codes.NotFound, "fakeServerStream has no message, sorry")
 	}
 	return nil
 }

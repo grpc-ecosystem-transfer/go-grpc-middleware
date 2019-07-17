@@ -1,10 +1,10 @@
 package grpc_ctxtags_test
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"testing"
-
 	"time"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags"
@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
 
@@ -97,7 +96,9 @@ func (s *TaggingSuite) SetupTest() {
 }
 
 func (s *TaggingSuite) TestPing_WithCustomTags() {
-	resp, err := s.Client.Ping(s.SimpleCtx(), goodPing)
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	resp, err := s.Client.Ping(ctx, goodPing)
 	require.NoError(s.T(), err, "must not be an error on a successful call")
 
 	tags := tagsFromJson(s.T(), resp.Value)
@@ -107,7 +108,8 @@ func (s *TaggingSuite) TestPing_WithCustomTags() {
 }
 
 func (s *TaggingSuite) TestPing_WithDeadline() {
-	ctx, _ := context.WithDeadline(context.TODO(), time.Now().AddDate(0, 0, 5))
+	ctx, cancel := context.WithDeadline(context.TODO(), time.Now().AddDate(0, 0, 5))
+	defer cancel()
 	resp, err := s.Client.Ping(ctx, goodPing)
 	require.NoError(s.T(), err, "must not be an error on a successful call")
 
@@ -131,7 +133,9 @@ func (s *TaggingSuite) TestPing_WithNoDeadline() {
 }
 
 func (s *TaggingSuite) TestPingList_WithCustomTags() {
-	stream, err := s.Client.PingList(s.SimpleCtx(), goodPing)
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	stream, err := s.Client.PingList(ctx, goodPing)
 	require.NoError(s.T(), err, "should not fail on establishing the stream")
 	for {
 		resp, err := stream.Recv()
@@ -172,7 +176,9 @@ type ClientStreamedTaggingSuite struct {
 }
 
 func (s *ClientStreamedTaggingSuite) TestPingStream_WithCustomTagsFirstRequest() {
-	stream, err := s.Client.PingStream(s.SimpleCtx())
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	stream, err := s.Client.PingStream(ctx)
 	require.NoError(s.T(), err, "should not fail on establishing the stream")
 
 	count := 0

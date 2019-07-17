@@ -2,6 +2,7 @@ package grpc_zap
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 
 	"github.com/golang/protobuf/jsonpb"
@@ -10,7 +11,6 @@ import (
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
 

@@ -1,9 +1,9 @@
 package ctx_logrus
 
 import (
+	"context"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/logrus/ctxlogrus"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 )
 
 // AddFields adds logrus fields to the logger.

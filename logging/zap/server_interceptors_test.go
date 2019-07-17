@@ -56,7 +56,9 @@ type zapServerSuite struct {
 
 func (s *zapServerSuite) TestPing_WithCustomTags() {
 	deadline := time.Now().Add(3 * time.Second)
-	_, err := s.Client.Ping(s.DeadlineCtx(deadline), goodPing)
+	ctx, cancel := s.DeadlineCtx(deadline)
+	defer cancel()
+	_, err := s.Client.Ping(ctx, goodPing)
 	require.NoError(s.T(), err, "there must be not be an error on a successful call")
 
 	msgs := s.getOutputJSONs()
@@ -115,8 +117,9 @@ func (s *zapServerSuite) TestPingError_WithCustomLevels() {
 		},
 	} {
 		s.buffer.Reset()
+		ctx, cancel := s.SimpleCtx()
 		_, err := s.Client.PingError(
-			s.SimpleCtx(),
+			ctx,
 			&pb_testproto.PingRequest{Value: "something", ErrorCodeReturned: uint32(tcase.code)})
 		require.Error(s.T(), err, "each call here must return an error")
 
@@ -133,11 +136,14 @@ func (s *zapServerSuite) TestPingError_WithCustomLevels() {
 		require.Contains(s.T(), m, "grpc.start_time", "all lines must contain the start time")
 		_, err = time.Parse(time.RFC3339, m["grpc.start_time"].(string))
 		assert.NoError(s.T(), err, "should be able to parse start time as RFC3339")
+		cancel()
 	}
 }
 
 func (s *zapServerSuite) TestPingList_WithCustomTags() {
-	stream, err := s.Client.PingList(s.SimpleCtx(), goodPing)
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	stream, err := s.Client.PingList(ctx, goodPing)
 	require.NoError(s.T(), err, "should not fail on establishing the stream")
 	for {
 		_, err := stream.Recv()
@@ -194,7 +200,9 @@ type zapServerOverrideSuite struct {
 }
 
 func (s *zapServerOverrideSuite) TestPing_HasOverriddenDuration() {
-	_, err := s.Client.Ping(s.SimpleCtx(), goodPing)
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	_, err := s.Client.Ping(ctx, goodPing)
 	require.NoError(s.T(), err, "there must be not be an error on a successful call")
 	msgs := s.getOutputJSONs()
 	require.Len(s.T(), msgs, 2, "two log statements should be logged")
@@ -214,7 +222,9 @@ func (s *zapServerOverrideSuite) TestPing_HasOverriddenDuration() {
 }
 
 func (s *zapServerOverrideSuite) TestPingList_HasOverriddenDuration() {
-	stream, err := s.Client.PingList(s.SimpleCtx(), goodPing)
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	stream, err := s.Client.PingList(ctx, goodPing)
 	require.NoError(s.T(), err, "should not fail on establishing the stream")
 	for {
 		_, err := stream.Recv()
@@ -271,7 +281,9 @@ type zapServerOverridenDeciderSuite struct {
 }
 
 func (s *zapServerOverridenDeciderSuite) TestPing_HasOverriddenDecider() {
-	_, err := s.Client.Ping(s.SimpleCtx(), goodPing)
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	_, err := s.Client.Ping(ctx, goodPing)
 	require.NoError(s.T(), err, "there must be not be an error on a successful call")
 	msgs := s.getOutputJSONs()
 	require.Len(s.T(), msgs, 1, "single log statements should be logged")
@@ -287,8 +299,10 @@ func (s *zapServerOverridenDeciderSuite) TestPingError_HasOverriddenDecider() {
 	msg := "NotFound must remap to InfoLevel in DefaultCodeToLevel"
 
 	s.buffer.Reset()
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
 	_, err := s.Client.PingError(
-		s.SimpleCtx(),
+		ctx,
 		&pb_testproto.PingRequest{Value: "something", ErrorCodeReturned: uint32(code)})
 	require.Error(s.T(), err, "each call here must return an error")
 	msgs := s.getOutputJSONs()
@@ -298,10 +312,13 @@ func (s *zapServerOverridenDeciderSuite) TestPingError_HasOverriddenDecider() {
 	assert.Equal(s.T(), m["grpc.method"], "PingError", "all lines must contain method name")
 	assert.Equal(s.T(), m["grpc.code"], code.String(), "all lines must contain the correct gRPC code")
 	assert.Equal(s.T(), m["level"], level.String(), msg)
+	cancel()
 }
 
 func (s *zapServerOverridenDeciderSuite) TestPingList_HasOverriddenDecider() {
-	stream, err := s.Client.PingList(s.SimpleCtx(), goodPing)
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	stream, err := s.Client.PingList(ctx, goodPing)
 	require.NoError(s.T(), err, "should not fail on establishing the stream")
 	for {
 		_, err := stream.Recv()

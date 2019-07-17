@@ -4,17 +4,16 @@
 package grpc_testing
 
 import (
-	"net"
-	"time"
-
+	"context"
 	"flag"
+	"net"
 	"path"
 	"runtime"
+	"time"
 
 	pb_testproto "github.com/grpc-ecosystem/go-grpc-middleware/testing/testproto"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
@@ -49,7 +48,6 @@ type InterceptorTestSuite struct {
 func (s *InterceptorTestSuite) SetupSuite() {
 	s.restartServerWithDelayedStart = make(chan time.Duration)
 	s.serverRunning = make(chan bool)
-
 	s.serverAddr = "127.0.0.1:0"
 
 	go func() {
@@ -117,14 +115,12 @@ func (s *InterceptorTestSuite) ServerAddr() string {
 	return s.serverAddr
 }
 
-func (s *InterceptorTestSuite) SimpleCtx() context.Context {
-	ctx, _ := context.WithTimeout(context.TODO(), 2*time.Second)
-	return ctx
+func (s *InterceptorTestSuite) SimpleCtx() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.TODO(), 2*time.Second)
 }
 
-func (s *InterceptorTestSuite) DeadlineCtx(deadline time.Time) context.Context {
-	ctx, _ := context.WithDeadline(context.TODO(), deadline)
-	return ctx
+func (s *InterceptorTestSuite) DeadlineCtx(deadline time.Time) (context.Context, context.CancelFunc) {
+	return context.WithDeadline(context.TODO(), deadline)
 }
 
 func (s *InterceptorTestSuite) TearDownSuite() {

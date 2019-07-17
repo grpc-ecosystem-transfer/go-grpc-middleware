@@ -4,12 +4,12 @@
 package grpc_zap
 
 import (
+	"context"
 	"path"
 	"time"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
 

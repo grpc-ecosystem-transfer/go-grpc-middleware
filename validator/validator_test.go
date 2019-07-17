@@ -4,20 +4,18 @@
 package grpc_validator_test
 
 import (
-	"testing"
-
-	"github.com/stretchr/testify/suite"
-	"google.golang.org/grpc"
-
 	"io"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc/codes"
+	"testing"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/testing"
 	pb_testproto "github.com/grpc-ecosystem/go-grpc-middleware/testing/testproto"
 	"github.com/grpc-ecosystem/go-grpc-middleware/validator"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 var (
@@ -43,18 +41,24 @@ type ValidatorTestSuite struct {
 }
 
 func (s *ValidatorTestSuite) TestValidPasses_Unary() {
-	_, err := s.Client.Ping(s.SimpleCtx(), goodPing)
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	_, err := s.Client.Ping(ctx, goodPing)
 	assert.NoError(s.T(), err, "no error expected")
 }
 
 func (s *ValidatorTestSuite) TestInvalidErrors_Unary() {
-	_, err := s.Client.Ping(s.SimpleCtx(), badPing)
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	_, err := s.Client.Ping(ctx, badPing)
 	assert.Error(s.T(), err, "no error expected")
-	assert.Equal(s.T(), codes.InvalidArgument, grpc.Code(err), "gRPC status must be InvalidArgument")
+	assert.Equal(s.T(), codes.InvalidArgument, status.Code(err), "gRPC status must be InvalidArgument")
 }
 
 func (s *ValidatorTestSuite) TestValidPasses_ServerStream() {
-	stream, err := s.Client.PingList(s.SimpleCtx(), goodPing)
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	stream, err := s.Client.PingList(ctx, goodPing)
 	require.NoError(s.T(), err, "no error on stream establishment expected")
 	for true {
 		_, err := stream.Recv()
@@ -66,28 +70,32 @@ func (s *ValidatorTestSuite) TestValidPasses_ServerStream() {
 }
 
 func (s *ValidatorTestSuite) TestInvalidErrors_ServerStream() {
-	stream, err := s.Client.PingList(s.SimpleCtx(), badPing)
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	stream, err := s.Client.PingList(ctx, badPing)
 	require.NoError(s.T(), err, "no error on stream establishment expected")
 	_, err = stream.Recv()
 	assert.Error(s.T(), err, "error should be received on first message")
-	assert.Equal(s.T(), codes.InvalidArgument, grpc.Code(err), "gRPC status must be InvalidArgument")
+	assert.Equal(s.T(), codes.InvalidArgument, status.Code(err), "gRPC status must be InvalidArgument")
 }
 
 func (s *ValidatorTestSuite) TestInvalidErrors_BidiStream() {
-	stream, err := s.Client.PingStream(s.SimpleCtx())
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	stream, err := s.Client.PingStream(ctx)
 	require.NoError(s.T(), err, "no error on stream establishment expected")
 
-	stream.Send(goodPing)
+	_ = stream.Send(goodPing)
 	_, err = stream.Recv()
-	assert.NoError(s.T(), err, "receving a good ping should return a good pong")
-	stream.Send(goodPing)
+	assert.NoError(s.T(), err, "receiving a good ping should return a good pong")
+	_ =stream.Send(goodPing)
 	_, err = stream.Recv()
-	assert.NoError(s.T(), err, "receving a good ping should return a good pong")
+	assert.NoError(s.T(), err, "receiving a good ping should return a good pong")
 
-	stream.Send(badPing)
+	_ = stream.Send(badPing)
 	_, err = stream.Recv()
-	assert.Error(s.T(), err, "receving a good ping should return a good pong")
-	assert.Equal(s.T(), codes.InvalidArgument, grpc.Code(err), "gRPC status must be InvalidArgument")
+	assert.Error(s.T(), err, "receiving a good ping should return a good pong")
+	assert.Equal(s.T(), codes.InvalidArgument, status.Code(err), "gRPC status must be InvalidArgument")
 
 	err = stream.CloseSend()
 	assert.NoError(s.T(), err, "there should be no error closing the stream on send")

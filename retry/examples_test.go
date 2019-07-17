@@ -4,22 +4,21 @@
 package grpc_retry_test
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"time"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/retry"
 	pb_testproto "github.com/grpc-ecosystem/go-grpc-middleware/testing/testproto"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 )
 
 var cc *grpc.ClientConn
 
-func newCtx(timeout time.Duration) context.Context {
-	ctx, _ := context.WithTimeout(context.TODO(), timeout)
-	return ctx
+func newCtx(timeout time.Duration) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.TODO(), timeout)
 }
 
 // Simple example of using the default interceptor configuration.
@@ -58,8 +57,9 @@ func Example_initializationWithExponentialBackoff() {
 // Simple example of an idempotent `ServerStream` call, that will be retried automatically 3 times.
 func Example_simpleCall() {
 	client := pb_testproto.NewTestServiceClient(cc)
-	stream, _ := client.PingList(newCtx(1*time.Second), &pb_testproto.PingRequest{}, grpc_retry.WithMax(3))
-
+	ctx, cancel := newCtx(1*time.Second)
+	defer cancel()
+	stream, _ := client.PingList(ctx, &pb_testproto.PingRequest{}, grpc_retry.WithMax(3))
 	for {
 		pong, err := stream.Recv() // retries happen here
 		if err == io.EOF {
@@ -74,7 +74,7 @@ func Example_simpleCall() {
 // This is an example of an `Unary` call that will also retry on deadlines.
 //
 // Because the passed in context has a `5s` timeout, the whole `Ping` invocation should finish
-// within that time. However, by defauly all retried calls will use the parent context for their
+// within that time. However, by default all retried calls will use the parent context for their
 // deadlines. This means, that unless you shorten the deadline of each call of the retry, you won't
 // be able to retry the first call at all.
 //
@@ -82,8 +82,10 @@ func Example_simpleCall() {
 // multiple retries in the single parent deadline.
 func ExampleWithPerRetryTimeout() {
 	client := pb_testproto.NewTestServiceClient(cc)
+	ctx, cancel := newCtx(5*time.Second)
+	defer cancel()
 	pong, _ := client.Ping(
-		newCtx(5*time.Second),
+		ctx,
 		&pb_testproto.PingRequest{},
 		grpc_retry.WithMax(3),
 		grpc_retry.WithPerRetryTimeout(1*time.Second))

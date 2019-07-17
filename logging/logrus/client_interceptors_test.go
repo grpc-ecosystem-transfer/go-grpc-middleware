@@ -7,14 +7,13 @@ import (
 	"testing"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/logrus"
+	pb_testproto "github.com/grpc-ecosystem/go-grpc-middleware/testing/testproto"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-
-	pb_testproto "github.com/grpc-ecosystem/go-grpc-middleware/testing/testproto"
 )
 
 func customClientCodeToLevel(c codes.Code) logrus.Level {
@@ -48,7 +47,9 @@ type logrusClientSuite struct {
 }
 
 func (s *logrusClientSuite) TestPing() {
-	_, err := s.Client.Ping(s.SimpleCtx(), goodPing)
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	_, err := s.Client.Ping(ctx, goodPing)
 	assert.NoError(s.T(), err, "there must be not be an on a successful call")
 
 	msgs := s.getOutputJSONs()
@@ -64,7 +65,9 @@ func (s *logrusClientSuite) TestPing() {
 }
 
 func (s *logrusClientSuite) TestPingList() {
-	stream, err := s.Client.PingList(s.SimpleCtx(), goodPing)
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	stream, err := s.Client.PingList(ctx, goodPing)
 	require.NoError(s.T(), err, "should not fail on establishing the stream")
 	for {
 		_, err := stream.Recv()
@@ -113,8 +116,9 @@ func (s *logrusClientSuite) TestPingError_WithCustomLevels() {
 		},
 	} {
 		s.SetupTest()
+		ctx, cancel := s.SimpleCtx()
 		_, err := s.Client.PingError(
-			s.SimpleCtx(),
+			ctx,
 			&pb_testproto.PingRequest{Value: "something", ErrorCodeReturned: uint32(tcase.code)})
 
 		assert.Error(s.T(), err, "each call here must return an error")
@@ -126,6 +130,7 @@ func (s *logrusClientSuite) TestPingError_WithCustomLevels() {
 		assert.Equal(s.T(), msgs[0]["grpc.method"], "PingError", "all lines must contain the correct method name")
 		assert.Equal(s.T(), msgs[0]["grpc.code"], tcase.code.String(), "all lines must contain a grpc code")
 		assert.Equal(s.T(), msgs[0]["level"], tcase.level.String(), tcase.msg)
+		cancel()
 	}
 }
 
@@ -151,7 +156,9 @@ type logrusClientOverrideSuite struct {
 }
 
 func (s *logrusClientOverrideSuite) TestPing_HasOverrides() {
-	_, err := s.Client.Ping(s.SimpleCtx(), goodPing)
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	_, err := s.Client.Ping(ctx, goodPing)
 	assert.NoError(s.T(), err, "there must be not be an on a successful call")
 
 	msgs := s.getOutputJSONs()
@@ -165,7 +172,9 @@ func (s *logrusClientOverrideSuite) TestPing_HasOverrides() {
 }
 
 func (s *logrusClientOverrideSuite) TestPingList_HasOverrides() {
-	stream, err := s.Client.PingList(s.SimpleCtx(), goodPing)
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	stream, err := s.Client.PingList(ctx, goodPing)
 	require.NoError(s.T(), err, "should not fail on establishing the stream")
 	for {
 		_, err := stream.Recv()

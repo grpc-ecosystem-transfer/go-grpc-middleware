@@ -1,10 +1,10 @@
 package ctx_zap
 
 import (
+	"context"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"golang.org/x/net/context"
 )
 
 // AddFields adds zap fields to the logger.

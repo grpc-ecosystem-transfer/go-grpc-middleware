@@ -4,13 +4,9 @@
 package grpc_auth_test
 
 import (
-	"testing"
-
-	"github.com/stretchr/testify/suite"
-	"google.golang.org/grpc"
-
+	"context"
 	"fmt"
-
+	"testing"
 	"time"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/auth"
@@ -19,11 +15,13 @@ import (
 	"github.com/grpc-ecosystem/go-grpc-middleware/util/metautils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/net/context"
+	"github.com/stretchr/testify/suite"
 	"golang.org/x/oauth2"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/oauth"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 var (
@@ -43,7 +41,7 @@ func buildDummyAuthFunction(expectedScheme string, expectedToken string) func(ct
 			return nil, err
 		}
 		if token != expectedToken {
-			return nil, grpc.Errorf(codes.PermissionDenied, "buildDummyAuthFunction bad token")
+			return nil, status.Errorf(codes.PermissionDenied, "buildDummyAuthFunction bad token")
 		}
 		return context.WithValue(ctx, authedMarker, "marker_exists"), nil
 	}
@@ -93,47 +91,61 @@ type AuthTestSuite struct {
 }
 
 func (s *AuthTestSuite) TestUnary_NoAuth() {
-	_, err := s.Client.Ping(s.SimpleCtx(), goodPing)
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	_, err := s.Client.Ping(ctx, goodPing)
 	assert.Error(s.T(), err, "there must be an error")
-	assert.Equal(s.T(), codes.Unauthenticated, grpc.Code(err), "must error with unauthenticated")
+	assert.Equal(s.T(), codes.Unauthenticated, status.Code(err), "must error with unauthenticated")
 }
 
 func (s *AuthTestSuite) TestUnary_BadAuth() {
-	_, err := s.Client.Ping(ctxWithToken(s.SimpleCtx(), "bearer", "bad_token"), goodPing)
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	_, err := s.Client.Ping(ctxWithToken(ctx, "bearer", "bad_token"), goodPing)
 	assert.Error(s.T(), err, "there must be an error")
-	assert.Equal(s.T(), codes.PermissionDenied, grpc.Code(err), "must error with permission denied")
+	assert.Equal(s.T(), codes.PermissionDenied, status.Code(err), "must error with permission denied")
 }
 
 func (s *AuthTestSuite) TestUnary_PassesAuth() {
-	_, err := s.Client.Ping(ctxWithToken(s.SimpleCtx(), "bearer", commonAuthToken), goodPing)
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	_, err := s.Client.Ping(ctxWithToken(ctx, "bearer", commonAuthToken), goodPing)
 	require.NoError(s.T(), err, "no error must occur")
 }
 
 func (s *AuthTestSuite) TestUnary_PassesWithPerRpcCredentials() {
 	grpcCreds := oauth.TokenSource{TokenSource: &fakeOAuth2TokenSource{accessToken: commonAuthToken}}
 	client := s.NewClient(grpc.WithPerRPCCredentials(grpcCreds))
-	_, err := client.Ping(s.SimpleCtx(), goodPing)
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	_, err := client.Ping(ctx, goodPing)
 	require.NoError(s.T(), err, "no error must occur")
 }
 
 func (s *AuthTestSuite) TestStream_NoAuth() {
-	stream, err := s.Client.PingList(s.SimpleCtx(), goodPing)
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	stream, err := s.Client.PingList(ctx, goodPing)
 	require.NoError(s.T(), err, "should not fail on establishing the stream")
 	_, err = stream.Recv()
 	assert.Error(s.T(), err, "there must be an error")
-	assert.Equal(s.T(), codes.Unauthenticated, grpc.Code(err), "must error with unauthenticated")
+	assert.Equal(s.T(), codes.Unauthenticated, status.Code(err), "must error with unauthenticated")
 }
 
 func (s *AuthTestSuite) TestStream_BadAuth() {
-	stream, err := s.Client.PingList(ctxWithToken(s.SimpleCtx(), "bearer", "bad_token"), goodPing)
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	stream, err := s.Client.PingList(ctxWithToken(ctx, "bearer", "bad_token"), goodPing)
 	require.NoError(s.T(), err, "should not fail on establishing the stream")
 	_, err = stream.Recv()
 	assert.Error(s.T(), err, "there must be an error")
-	assert.Equal(s.T(), codes.PermissionDenied, grpc.Code(err), "must error with permission denied")
+	assert.Equal(s.T(), codes.PermissionDenied, status.Code(err), "must error with permission denied")
 }
 
 func (s *AuthTestSuite) TestStream_PassesAuth() {
-	stream, err := s.Client.PingList(ctxWithToken(s.SimpleCtx(), "Bearer", commonAuthToken), goodPing)
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	stream, err := s.Client.PingList(ctxWithToken(ctx, "Bearer", commonAuthToken), goodPing)
 	require.NoError(s.T(), err, "should not fail on establishing the stream")
 	pong, err := stream.Recv()
 	require.NoError(s.T(), err, "no error must occur")
@@ -141,9 +153,11 @@ func (s *AuthTestSuite) TestStream_PassesAuth() {
 }
 
 func (s *AuthTestSuite) TestStream_PassesWithPerRpcCredentials() {
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
 	grpcCreds := oauth.TokenSource{TokenSource: &fakeOAuth2TokenSource{accessToken: commonAuthToken}}
 	client := s.NewClient(grpc.WithPerRPCCredentials(grpcCreds))
-	stream, err := client.PingList(s.SimpleCtx(), goodPing)
+	stream, err := client.PingList(ctx, goodPing)
 	require.NoError(s.T(), err, "should not fail on establishing the stream")
 	pong, err := stream.Recv()
 	require.NoError(s.T(), err, "no error must occur")
@@ -179,12 +193,16 @@ type AuthOverrideTestSuite struct {
 }
 
 func (s *AuthOverrideTestSuite) TestUnary_PassesAuth() {
-	_, err := s.Client.Ping(ctxWithToken(s.SimpleCtx(), "bearer", overrideAuthToken), goodPing)
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	_, err := s.Client.Ping(ctxWithToken(ctx, "bearer", overrideAuthToken), goodPing)
 	require.NoError(s.T(), err, "no error must occur")
 }
 
 func (s *AuthOverrideTestSuite) TestStream_PassesAuth() {
-	stream, err := s.Client.PingList(ctxWithToken(s.SimpleCtx(), "Bearer", overrideAuthToken), goodPing)
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	stream, err := s.Client.PingList(ctxWithToken(ctx, "Bearer", overrideAuthToken), goodPing)
 	require.NoError(s.T(), err, "should not fail on establishing the stream")
 	pong, err := stream.Recv()
 	require.NoError(s.T(), err, "no error must occur")

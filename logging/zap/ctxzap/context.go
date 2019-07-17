@@ -1,10 +1,10 @@
 package ctxzap
 
 import (
+	"context"
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"golang.org/x/net/context"
 )
 
 type ctxMarker struct{}

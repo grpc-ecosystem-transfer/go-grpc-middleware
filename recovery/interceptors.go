@@ -4,9 +4,11 @@
 package grpc_recovery
 
 import (
-	"golang.org/x/net/context"
+	"context"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // RecoveryHandlerFunc is a function that recovers from the panic `p` by returning an `error`.
@@ -46,7 +48,7 @@ func StreamServerInterceptor(opts ...Option) grpc.StreamServerInterceptor {
 
 func recoverFrom(ctx context.Context, p interface{}, r RecoveryHandlerFuncContext) error {
 	if r == nil {
-		return grpc.Errorf(codes.Internal, "%s", p)
+		return status.Errorf(codes.Internal, "%s", p)
 	}
 	return r(ctx, p)
 }

@@ -4,13 +4,13 @@
 package metautils
 
 import (
+	"context"
 	"strings"
 
-	"golang.org/x/net/context"
 	"google.golang.org/grpc/metadata"
 )
 
-// NiceMD is a convenience wrapper definiting extra functions on the metadata.
+// NiceMD is a convenience wrapper defining extra functions on the metadata.
 type NiceMD metadata.MD
 
 // ExtractIncoming extracts an inbound metadata from the server-side context.

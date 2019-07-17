@@ -2,6 +2,7 @@ package grpc_zap_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"testing"
@@ -12,7 +13,6 @@ import (
 	pb_testproto "github.com/grpc-ecosystem/go-grpc-middleware/testing/testproto"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"golang.org/x/net/context"
 )
 
 var (

@@ -1,9 +1,9 @@
 package ctxlogrus
 
 import (
+	"context"
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 )
 
 type ctxLoggerMarker struct{}

@@ -4,9 +4,9 @@
 package grpc_retry
 
 import (
+	"context"
 	"time"
 
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 )
@@ -19,7 +19,7 @@ var (
 	DefaultRetriableCodes = []codes.Code{codes.ResourceExhausted, codes.Unavailable}
 
 	defaultOptions = &options{
-		max:            0, // disabed
+		max:            0, // disabled
 		perCallTimeout: 0, // disabled
 		includeHeader:  true,
 		codes:          DefaultRetriableCodes,

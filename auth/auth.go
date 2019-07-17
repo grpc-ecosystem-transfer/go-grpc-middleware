@@ -4,8 +4,9 @@
 package grpc_auth
 
 import (
+	"context"
+
 	"github.com/grpc-ecosystem/go-grpc-middleware"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
 
@@ -17,7 +18,7 @@ import (
 // The returned context will be propagated to handlers, allowing user changes to `Context`. However,
 // please make sure that the `Context` returned is a child `Context` of the one passed in.
 //
-// If error is returned, its `grpc.Code()` will be returned to the user as well as the verbatim message.
+// If error is returned, its `status.Code()` will be returned to the user as well as the verbatim message.
 // Please make sure you use `codes.Unauthenticated` (lacking auth) and `codes.PermissionDenied`
 // (authed, but lacking perms) appropriately.
 type AuthFunc func(ctx context.Context) (context.Context, error)

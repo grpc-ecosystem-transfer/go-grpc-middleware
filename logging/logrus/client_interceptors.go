@@ -4,11 +4,11 @@
 package grpc_logrus
 
 import (
+	"context"
 	"path"
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
 
@@ -53,7 +53,7 @@ func logFinalClientLine(o *options, entry *logrus.Entry, startTime time.Time, er
 		msg)
 }
 
-func newClientLoggerFields(ctx context.Context, fullMethodString string) logrus.Fields {
+func newClientLoggerFields(_ context.Context, fullMethodString string) logrus.Fields {
 	service := path.Dir(fullMethodString)[1:]
 	method := path.Base(fullMethodString)
 	return logrus.Fields{

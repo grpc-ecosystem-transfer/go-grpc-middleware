@@ -2,6 +2,7 @@ package grpc_logrus_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"testing"
@@ -12,7 +13,6 @@ import (
 	"github.com/grpc-ecosystem/go-grpc-middleware/testing"
 	pb_testproto "github.com/grpc-ecosystem/go-grpc-middleware/testing/testproto"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 )
 

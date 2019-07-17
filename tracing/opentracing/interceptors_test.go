@@ -4,15 +4,14 @@
 package grpc_opentracing_test
 
 import (
+	"context"
 	"errors"
+	"fmt"
+	"io"
+	"net/http"
 	"strconv"
 	"strings"
 	"testing"
-
-	"fmt"
-	"net/http"
-
-	"io"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware"
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags"
@@ -24,7 +23,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 )
@@ -178,7 +176,9 @@ func (s *OpentracingSuite) assertTracesCreated(methodName string) (clientSpan *m
 }
 
 func (s *OpentracingSuite) TestPing_PropagatesTraces() {
-	ctx := s.createContextFromFakeHttpRequestParent(s.SimpleCtx(), true)
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	ctx = s.createContextFromFakeHttpRequestParent(ctx, true)
 	_, err := s.Client.Ping(ctx, goodPing)
 	require.NoError(s.T(), err, "there must be not be an on a successful call")
 	s.assertTracesCreated("/mwitkow.testproto.TestService/Ping")
@@ -186,8 +186,10 @@ func (s *OpentracingSuite) TestPing_PropagatesTraces() {
 
 func (s *OpentracingSuite) TestPing_ClientContextTags() {
 	const name = "opentracing.custom"
-	ctx := grpc_opentracing.ClientAddContextTags(
-		s.createContextFromFakeHttpRequestParent(s.SimpleCtx(), true),
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	ctx = grpc_opentracing.ClientAddContextTags(
+		s.createContextFromFakeHttpRequestParent(ctx, true),
 		opentracing.Tags{name: ""},
 	)
 
@@ -205,7 +207,9 @@ func (s *OpentracingSuite) TestPing_ClientContextTags() {
 }
 
 func (s *OpentracingSuite) TestPingList_PropagatesTraces() {
-	ctx := s.createContextFromFakeHttpRequestParent(s.SimpleCtx(), true)
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	ctx = s.createContextFromFakeHttpRequestParent(ctx, true)
 	stream, err := s.Client.PingList(ctx, goodPing)
 	require.NoError(s.T(), err, "should not fail on establishing the stream")
 	for {
@@ -219,7 +223,9 @@ func (s *OpentracingSuite) TestPingList_PropagatesTraces() {
 }
 
 func (s *OpentracingSuite) TestPingError_PropagatesTraces() {
-	ctx := s.createContextFromFakeHttpRequestParent(s.SimpleCtx(), true)
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	ctx = s.createContextFromFakeHttpRequestParent(ctx, true)
 	erroringPing := &pb_testproto.PingRequest{Value: "something", ErrorCodeReturned: uint32(codes.OutOfRange)}
 	_, err := s.Client.PingError(ctx, erroringPing)
 	require.Error(s.T(), err, "there must be an error returned here")
@@ -229,7 +235,9 @@ func (s *OpentracingSuite) TestPingError_PropagatesTraces() {
 }
 
 func (s *OpentracingSuite) TestPingEmpty_NotSampleTraces() {
-	ctx := s.createContextFromFakeHttpRequestParent(s.SimpleCtx(), false)
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	ctx = s.createContextFromFakeHttpRequestParent(ctx, false)
 	_, err := s.Client.PingEmpty(ctx, &pb_testproto.Empty{})
 	require.NoError(s.T(), err, "there must be not be an on a successful call")
 }

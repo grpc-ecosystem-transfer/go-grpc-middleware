@@ -4,9 +4,10 @@
 package grpc_logging
 
 import (
-	"golang.org/x/net/context"
-	"google.golang.org/grpc"
+	"context"
+
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // ErrorToCode function determines the error code of an error
@@ -14,7 +15,7 @@ import (
 type ErrorToCode func(err error) codes.Code
 
 func DefaultErrorToCode(err error) codes.Code {
-	return grpc.Code(err)
+	return status.Code(err)
 }
 
 // Decider function defines rules for suppressing any interceptor logs

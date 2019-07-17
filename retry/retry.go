@@ -15,10 +15,11 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 const (
-	AttemptMetadataKey = "x-retry-attempty"
+	AttemptMetadataKey = "x-retry-attempt"
 )
 
 // UnaryClientInterceptor returns a new retrying unary client interceptor.
@@ -83,7 +84,7 @@ func StreamClientInterceptor(optFuncs ...CallOption) grpc.StreamClientIntercepto
 			return streamer(parentCtx, desc, cc, method, grpcOpts...)
 		}
 		if desc.ClientStreams {
-			return nil, grpc.Errorf(codes.Unimplemented, "grpc_retry: cannot retry on ClientStreams, set grpc_retry.Disable()")
+			return nil, status.Errorf(codes.Unimplemented, "grpc_retry: cannot retry on ClientStreams, set grpc_retry.Disable()")
 		}
 
 		var lastErr error
@@ -132,7 +133,7 @@ func StreamClientInterceptor(optFuncs ...CallOption) grpc.StreamClientIntercepto
 // a new ClientStream according to the retry policy.
 type serverStreamingRetryingStream struct {
 	grpc.ClientStream
-	bufferedSends []interface{} // single messsage that the client can sen
+	bufferedSends []interface{} // single message that the client can sen
 	receivedGood  bool          // indicates whether any prior receives were successful
 	wasClosedSend bool          // indicates that CloseSend was closed
 	parentCtx     context.Context
@@ -193,7 +194,6 @@ func (s *serverStreamingRetryingStream) RecvMsg(m interface{}) error {
 		}
 		s.setStream(newStream)
 		attemptRetry, lastErr = s.receiveMsgAndIndicateRetry(m)
-		//fmt.Printf("Received message and indicate: %v  %v\n", attemptRetry, lastErr)
 		if !attemptRetry {
 			return lastErr
 		}
@@ -270,7 +270,7 @@ func waitRetryBackoff(attempt uint, parentCtx context.Context, callOpts *options
 }
 
 func isRetriable(err error, callOpts *options) bool {
-	errCode := grpc.Code(err)
+	errCode := status.Code(err)
 	if isContextError(err) {
 		// context errors are not retriable based on user settings.
 		return false
@@ -284,7 +284,7 @@ func isRetriable(err error, callOpts *options) bool {
 }
 
 func isContextError(err error) bool {
-	return grpc.Code(err) == codes.DeadlineExceeded || grpc.Code(err) == codes.Canceled
+	return status.Code(err) == codes.DeadlineExceeded || status.Code(err) == codes.Canceled
 }
 
 func perCallContext(parentCtx context.Context, callOpts *options, attempt uint) context.Context {
@@ -302,11 +302,11 @@ func perCallContext(parentCtx context.Context, callOpts *options, attempt uint) 
 func contextErrToGrpcErr(err error) error {
 	switch err {
 	case context.DeadlineExceeded:
-		return grpc.Errorf(codes.DeadlineExceeded, err.Error())
+		return status.Errorf(codes.DeadlineExceeded, err.Error())
 	case context.Canceled:
-		return grpc.Errorf(codes.Canceled, err.Error())
+		return status.Errorf(codes.Canceled, err.Error())
 	default:
-		return grpc.Errorf(codes.Unknown, err.Error())
+		return status.Errorf(codes.Unknown, err.Error())
 	}
 }
 

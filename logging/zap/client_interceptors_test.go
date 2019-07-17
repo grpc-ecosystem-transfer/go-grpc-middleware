@@ -6,15 +6,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap"
+	pb_testproto "github.com/grpc-ecosystem/go-grpc-middleware/testing/testproto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-
-	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap"
-	pb_testproto "github.com/grpc-ecosystem/go-grpc-middleware/testing/testproto"
-	"go.uber.org/zap/zapcore"
 )
 
 func customClientCodeToLevel(c codes.Code) zapcore.Level {
@@ -47,7 +46,9 @@ type zapClientSuite struct {
 }
 
 func (s *zapClientSuite) TestPing() {
-	_, err := s.Client.Ping(s.SimpleCtx(), goodPing)
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	_, err := s.Client.Ping(ctx, goodPing)
 	require.NoError(s.T(), err, "there must be not be an error on a successful call")
 
 	msgs := s.getOutputJSONs()
@@ -62,7 +63,9 @@ func (s *zapClientSuite) TestPing() {
 }
 
 func (s *zapClientSuite) TestPingList() {
-	stream, err := s.Client.PingList(s.SimpleCtx(), goodPing)
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	stream, err := s.Client.PingList(ctx, goodPing)
 	require.NoError(s.T(), err, "should not fail on establishing the stream")
 	for {
 		_, err := stream.Recv()
@@ -110,8 +113,9 @@ func (s *zapClientSuite) TestPingError_WithCustomLevels() {
 		},
 	} {
 		s.SetupTest()
+		ctx, cancel := s.SimpleCtx()
 		_, err := s.Client.PingError(
-			s.SimpleCtx(),
+			ctx,
 			&pb_testproto.PingRequest{Value: "something", ErrorCodeReturned: uint32(tcase.code)})
 		require.Error(s.T(), err, "each call here must return an error")
 
@@ -122,6 +126,7 @@ func (s *zapClientSuite) TestPingError_WithCustomLevels() {
 		assert.Equal(s.T(), msgs[0]["grpc.method"], "PingError", "all lines must contain method name")
 		assert.Equal(s.T(), msgs[0]["grpc.code"], tcase.code.String(), "all lines must contain the correct gRPC code")
 		assert.Equal(s.T(), msgs[0]["level"], tcase.level.String(), tcase.msg)
+		cancel()
 	}
 }
 
@@ -146,7 +151,9 @@ type zapClientOverrideSuite struct {
 }
 
 func (s *zapClientOverrideSuite) TestPing_HasOverrides() {
-	_, err := s.Client.Ping(s.SimpleCtx(), goodPing)
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	_, err := s.Client.Ping(ctx, goodPing)
 	require.NoError(s.T(), err, "there must be not be an error on a successful call")
 
 	msgs := s.getOutputJSONs()
@@ -161,7 +168,9 @@ func (s *zapClientOverrideSuite) TestPing_HasOverrides() {
 }
 
 func (s *zapClientOverrideSuite) TestPingList_HasOverrides() {
-	stream, err := s.Client.PingList(s.SimpleCtx(), goodPing)
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	stream, err := s.Client.PingList(ctx, goodPing)
 	require.NoError(s.T(), err, "should not fail on establishing the stream")
 	for {
 		_, err := stream.Recv()

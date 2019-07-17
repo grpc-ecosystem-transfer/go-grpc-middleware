@@ -5,9 +5,8 @@ package grpc_opentracing
 
 import (
 	"encoding/base64"
-	"strings"
-
 	"fmt"
+	"strings"
 
 	"google.golang.org/grpc/metadata"
 )

@@ -45,7 +45,9 @@ type logrusServerSuite struct {
 
 func (s *logrusServerSuite) TestPing_WithCustomTags() {
 	deadline := time.Now().Add(3 * time.Second)
-	_, err := s.Client.Ping(s.DeadlineCtx(deadline), goodPing)
+	ctx, cancel := s.DeadlineCtx(deadline)
+	defer cancel()
+	_, err := s.Client.Ping(ctx, goodPing)
 	require.NoError(s.T(), err, "there must be not be an error on a successful call")
 
 	msgs := s.getOutputJSONs()
@@ -105,8 +107,9 @@ func (s *logrusServerSuite) TestPingError_WithCustomLevels() {
 		},
 	} {
 		s.buffer.Reset()
+		ctx, cancel := s.SimpleCtx()
 		_, err := s.Client.PingError(
-			s.SimpleCtx(),
+			ctx,
 			&pb_testproto.PingRequest{Value: "something", ErrorCodeReturned: uint32(tcase.code)})
 		require.Error(s.T(), err, "each call here must return an error")
 
@@ -126,11 +129,14 @@ func (s *logrusServerSuite) TestPingError_WithCustomLevels() {
 		require.Contains(s.T(), m, "grpc.request.deadline", "all lines must contain the deadline of the call")
 		_, err = time.Parse(time.RFC3339, m["grpc.request.deadline"].(string))
 		require.NoError(s.T(), err, "should be able to parse deadline as RFC3339")
+		cancel()
 	}
 }
 
 func (s *logrusServerSuite) TestPingList_WithCustomTags() {
-	stream, err := s.Client.PingList(s.SimpleCtx(), goodPing)
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	stream, err := s.Client.PingList(ctx, goodPing)
 	require.NoError(s.T(), err, "should not fail on establishing the stream")
 	for {
 		_, err := stream.Recv()
@@ -191,7 +197,9 @@ type logrusServerOverrideSuite struct {
 }
 
 func (s *logrusServerOverrideSuite) TestPing_HasOverriddenDuration() {
-	_, err := s.Client.Ping(s.SimpleCtx(), goodPing)
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	_, err := s.Client.Ping(ctx, goodPing)
 	require.NoError(s.T(), err, "there must be not be an error on a successful call")
 
 	msgs := s.getOutputJSONs()
@@ -212,7 +220,9 @@ func (s *logrusServerOverrideSuite) TestPing_HasOverriddenDuration() {
 }
 
 func (s *logrusServerOverrideSuite) TestPingList_HasOverriddenDuration() {
-	stream, err := s.Client.PingList(s.SimpleCtx(), goodPing)
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	stream, err := s.Client.PingList(ctx, goodPing)
 	require.NoError(s.T(), err, "should not fail on establishing the stream")
 	for {
 		_, err := stream.Recv()
@@ -270,7 +280,9 @@ type logrusServerOverrideDeciderSuite struct {
 }
 
 func (s *logrusServerOverrideDeciderSuite) TestPing_HasOverriddenDecider() {
-	_, err := s.Client.Ping(s.SimpleCtx(), goodPing)
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	_, err := s.Client.Ping(ctx, goodPing)
 	require.NoError(s.T(), err, "there must be not be an error on a successful call")
 
 	msgs := s.getOutputJSONs()
@@ -286,8 +298,9 @@ func (s *logrusServerOverrideDeciderSuite) TestPingError_HasOverriddenDecider() 
 	msg := "NotFound must remap to InfoLevel in DefaultCodeToLevel"
 
 	s.buffer.Reset()
+	ctx, cancel := s.SimpleCtx()
 	_, err := s.Client.PingError(
-		s.SimpleCtx(),
+		ctx,
 		&pb_testproto.PingRequest{Value: "something", ErrorCodeReturned: uint32(code)})
 	require.Error(s.T(), err, "each call here must return an error")
 
@@ -298,10 +311,13 @@ func (s *logrusServerOverrideDeciderSuite) TestPingError_HasOverriddenDecider() 
 	assert.Equal(s.T(), m["grpc.method"], "PingError", "all lines must contain method name")
 	assert.Equal(s.T(), m["grpc.code"], code.String(), "all lines must correct gRPC code")
 	assert.Equal(s.T(), m["level"], level.String(), msg)
+	cancel()
 }
 
 func (s *logrusServerOverrideDeciderSuite) TestPingList_HasOverriddenDecider() {
-	stream, err := s.Client.PingList(s.SimpleCtx(), goodPing)
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	stream, err := s.Client.PingList(ctx, goodPing)
 	require.NoError(s.T(), err, "should not fail on establishing the stream")
 	for {
 		_, err := stream.Recv()

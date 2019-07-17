@@ -1,6 +1,7 @@
 package grpc_logrus_test
 
 import (
+	"context"
 	"io"
 	"io/ioutil"
 	"runtime"
@@ -15,7 +16,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
 
@@ -73,7 +73,9 @@ func (s *logrusPayloadSuite) getServerAndClientMessages(expectedServer int, expe
 }
 
 func (s *logrusPayloadSuite) TestPing_LogsBothRequestAndResponse() {
-	_, err := s.Client.Ping(s.SimpleCtx(), goodPing)
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	_, err := s.Client.Ping(ctx, goodPing)
 	require.NoError(s.T(), err, "there must be not be an on a successful call")
 	serverMsgs, clientMsgs := s.getServerAndClientMessages(2, 2)
 
@@ -92,7 +94,9 @@ func (s *logrusPayloadSuite) TestPing_LogsBothRequestAndResponse() {
 }
 
 func (s *logrusPayloadSuite) TestPingError_LogsOnlyRequestsOnError() {
-	_, err := s.Client.PingError(s.SimpleCtx(), &pb_testproto.PingRequest{Value: "something", ErrorCodeReturned: uint32(4)})
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	_, err := s.Client.PingError(ctx, &pb_testproto.PingRequest{Value: "something", ErrorCodeReturned: uint32(4)})
 	require.Error(s.T(), err, "there must be not be an error on a successful call")
 
 	serverMsgs, clientMsgs := s.getServerAndClientMessages(1, 1)
@@ -108,7 +112,9 @@ func (s *logrusPayloadSuite) TestPingError_LogsOnlyRequestsOnError() {
 
 func (s *logrusPayloadSuite) TestPingStream_LogsAllRequestsAndResponses() {
 	messagesExpected := 20
-	stream, err := s.Client.PingStream(s.SimpleCtx())
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	stream, err := s.Client.PingStream(ctx)
 	require.NoError(s.T(), err, "no error on stream creation")
 	for i := 0; i < messagesExpected; i++ {
 		require.NoError(s.T(), stream.Send(goodPing), "sending must succeed")

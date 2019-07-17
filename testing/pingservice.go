@@ -8,20 +8,19 @@ Package `grpc_testing` provides helper functions for testing validators in this 
 package grpc_testing
 
 import (
+	"context"
 	"io"
 	"testing"
 
 	pb_testproto "github.com/grpc-ecosystem/go-grpc-middleware/testing/testproto"
-
-	"golang.org/x/net/context"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 const (
 	// DefaultPongValue is the default value used.
 	DefaultResponseValue = "default_response_value"
-	// ListResponseCount is the expeted number of responses to PingList
+	// ListResponseCount is the expected number of responses to PingList
 	ListResponseCount = 100
 )
 
@@ -40,16 +39,18 @@ func (s *TestPingService) Ping(ctx context.Context, ping *pb_testproto.PingReque
 
 func (s *TestPingService) PingError(ctx context.Context, ping *pb_testproto.PingRequest) (*pb_testproto.Empty, error) {
 	code := codes.Code(ping.ErrorCodeReturned)
-	return nil, grpc.Errorf(code, "Userspace error.")
+	return nil, status.Errorf(code, "Userspace error.")
 }
 
 func (s *TestPingService) PingList(ping *pb_testproto.PingRequest, stream pb_testproto.TestService_PingListServer) error {
 	if ping.ErrorCodeReturned != 0 {
-		return grpc.Errorf(codes.Code(ping.ErrorCodeReturned), "foobar")
+		return status.Errorf(codes.Code(ping.ErrorCodeReturned), "foobar")
 	}
 	// Send user trailers and headers.
 	for i := 0; i < ListResponseCount; i++ {
-		stream.Send(&pb_testproto.PingResponse{Value: ping.Value, Counter: int32(i)})
+		if err := stream.Send(&pb_testproto.PingResponse{Value: ping.Value, Counter: int32(i)}); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -64,7 +65,9 @@ func (s *TestPingService) PingStream(stream pb_testproto.TestService_PingStreamS
 		if err != nil {
 			return err
 		}
-		stream.Send(&pb_testproto.PingResponse{Value: ping.Value, Counter: int32(count)})
+		if err = stream.Send(&pb_testproto.PingResponse{Value: ping.Value, Counter: int32(count)}); err != nil {
+			return err
+		}
 		count += 1
 	}
 	return nil

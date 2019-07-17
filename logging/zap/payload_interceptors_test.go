@@ -1,26 +1,22 @@
 package grpc_zap_test
 
 import (
+	"context"
+	"io"
 	"runtime"
+	"strings"
 	"testing"
 
-	"strings"
-
-	"github.com/stretchr/testify/suite"
-	"google.golang.org/grpc"
-
-	"io"
-
 	"github.com/grpc-ecosystem/go-grpc-middleware"
+	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap"
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags"
 	pb_testproto "github.com/grpc-ecosystem/go-grpc-middleware/testing/testproto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/net/context"
-
-	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap"
+	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"google.golang.org/grpc"
 )
 
 func TestZapPayloadSuite(t *testing.T) {
@@ -70,7 +66,9 @@ func (s *zapPayloadSuite) getServerAndClientMessages(expectedServer int, expecte
 }
 
 func (s *zapPayloadSuite) TestPing_LogsBothRequestAndResponse() {
-	_, err := s.Client.Ping(s.SimpleCtx(), goodPing)
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	_, err := s.Client.Ping(ctx, goodPing)
 
 	require.NoError(s.T(), err, "there must be not be an error on a successful call")
 	serverMsgs, clientMsgs := s.getServerAndClientMessages(2, 2)
@@ -90,7 +88,9 @@ func (s *zapPayloadSuite) TestPing_LogsBothRequestAndResponse() {
 }
 
 func (s *zapPayloadSuite) TestPingError_LogsOnlyRequestsOnError() {
-	_, err := s.Client.PingError(s.SimpleCtx(), &pb_testproto.PingRequest{Value: "something", ErrorCodeReturned: uint32(4)})
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	_, err := s.Client.PingError(ctx, &pb_testproto.PingRequest{Value: "something", ErrorCodeReturned: uint32(4)})
 
 	require.Error(s.T(), err, "there must be an error on an unsuccessful call")
 	serverMsgs, clientMsgs := s.getServerAndClientMessages(1, 1)
@@ -106,7 +106,9 @@ func (s *zapPayloadSuite) TestPingError_LogsOnlyRequestsOnError() {
 
 func (s *zapPayloadSuite) TestPingStream_LogsAllRequestsAndResponses() {
 	messagesExpected := 20
-	stream, err := s.Client.PingStream(s.SimpleCtx())
+	ctx, cancel := s.SimpleCtx()
+	defer cancel()
+	stream, err := s.Client.PingStream(ctx)
 
 	require.NoError(s.T(), err, "no error on stream creation")
 	for i := 0; i < messagesExpected; i++ {

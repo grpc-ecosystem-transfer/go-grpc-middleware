@@ -1,11 +1,12 @@
 package grpc_zap
 
 import (
-	"github.com/stretchr/testify/assert"
-	"go.uber.org/zap/zapcore"
 	"math"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap/zapcore"
 )
 
 func TestDurationToTimeMillisField(t *testing.T) {

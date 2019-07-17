@@ -1,10 +1,10 @@
 package ctxlogrus_test
 
 import (
+	"context"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/logrus/ctxlogrus"
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 )
 
 var logrusLogger *logrus.Logger

@@ -1,22 +1,24 @@
 package grpc_auth_test
 
 import (
+	"context"
+
 	"github.com/grpc-ecosystem/go-grpc-middleware/auth"
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
-var (
-	cc *grpc.ClientConn
-)
+// var (
+// 	cc *grpc.ClientConn
+// )
 
-func parseToken(token string) (struct{}, error) {
+func parseToken(_ string) (struct{}, error) {
 	return struct{}{}, nil
 }
 
-func userClaimFromToken(struct{}) string {
+func userClaimFromToken(_ struct{}) string {
 	return "foobar"
 }
 
@@ -29,7 +31,7 @@ func Example_serverConfig() {
 		}
 		tokenInfo, err := parseToken(token)
 		if err != nil {
-			return nil, grpc.Errorf(codes.Unauthenticated, "invalid auth token: %v", err)
+			return nil, status.Errorf(codes.Unauthenticated, "invalid auth token: %v", err)
 		}
 		grpc_ctxtags.Extract(ctx).Set("auth.sub", userClaimFromToken(tokenInfo))
 		newCtx := context.WithValue(ctx, "tokenInfo", tokenInfo)
