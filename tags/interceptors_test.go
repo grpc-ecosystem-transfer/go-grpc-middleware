@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 )
 
 var (
@@ -200,4 +201,58 @@ func (s *ClientStreamedTaggingSuite) TestPingStream_WithCustomTagsFirstRequest()
 	}
 
 	assert.Equal(s.T(), count, 3)
+}
+
+func TestMetadataTaggingSuite(t *testing.T) {
+	opts := []grpc_ctxtags.Option{
+		grpc_ctxtags.WithFieldExtractor(grpc_ctxtags.TagBasedRequestMetadataExtractor("md.","key")),
+	}
+	s := &MetadataTaggingSuite{
+		InterceptorTestSuite: &grpc_testing.InterceptorTestSuite{
+			TestService: &tagPingBack{&grpc_testing.TestPingService{T: t}},
+			ServerOpts: []grpc.ServerOption{
+				grpc.StreamInterceptor(grpc_ctxtags.StreamServerInterceptor(opts...)),
+				grpc.UnaryInterceptor(grpc_ctxtags.UnaryServerInterceptor(opts...)),
+			},
+		},
+	}
+	suite.Run(t, s)
+}
+
+type MetadataTaggingSuite struct {
+	*grpc_testing.InterceptorTestSuite
+}
+
+func (s *MetadataTaggingSuite) SetupTest() {
+}
+
+func (s *MetadataTaggingSuite) TestPing_WithCustomTags() {
+	ctx := s.SimpleCtx()
+	md := metadata.Pairs("key", "mdvalue", "hidden", "secret")
+	ctxMd := metadata.NewOutgoingContext(ctx, md)
+	resp, err := s.Client.Ping(ctxMd, goodPing)
+	require.NoError(s.T(), err, "call must succeed")
+	tags := tagsFromJson(s.T(), resp.Value)
+	assert.Contains(s.T(), tags, "peer.address", "the tags should contain key address")
+	assert.Equal(s.T(), "mdvalue", tags["md.key"], "the tags should contain key from metadata")
+	assert.Len(s.T(), tags, 2, "the tags should contain only two values")
+}
+
+func (s *MetadataTaggingSuite) TestPingList_WithCustomTags() {
+	ctx := s.SimpleCtx()
+	md := metadata.Pairs("key", "mdvalue", "hidden", "secret")
+	ctxMd := metadata.NewOutgoingContext(ctx, md)
+	stream, err := s.Client.PingList(ctxMd, goodPing)
+	require.NoError(s.T(), err, "should not fail on establishing the stream")
+	for {
+		resp, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		require.NoError(s.T(), err, "reading stream should not fail")
+		tags := tagsFromJson(s.T(), resp.Value)
+		assert.Contains(s.T(), tags, "peer.address", "the tags should contain key address")
+		assert.Equal(s.T(), "mdvalue", tags["md.key"], "the tags should contain key from metadata")
+		assert.Len(s.T(), tags, 2, "the tags should contain only two values")
+	}
 }

@@ -30,7 +30,6 @@ func StreamServerInterceptor(opts ...Option) grpc.StreamServerInterceptor {
 	return func(srv interface{}, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		newCtx := newTagsForCtx(stream.Context())
 		if o.requestFieldsFunc == nil {
-			// Short-circuit, don't do the expensive bit of allocating a wrappedStream.
 			wrappedStream := grpc_middleware.WrapServerStream(stream)
 			wrappedStream.WrappedContext = newCtx
 			return handler(srv, wrappedStream)
@@ -61,8 +60,9 @@ func (w *wrappedStream) RecvMsg(m interface{}) error {
 	// We only do log fields extraction on the single-request of a server-side stream.
 	if !w.info.IsClientStream || w.opts.requestFieldsFromInitial && w.initial {
 		w.initial = false
-
-		setRequestFieldTags(w.Context(), w.opts.requestFieldsFunc, w.info.FullMethod, m)
+		if w.opts.requestFieldsFunc != nil {
+			setRequestFieldTags(w.Context(), w.opts.requestFieldsFunc, w.info.FullMethod, m)
+		}
 	}
 	return err
 }
@@ -75,11 +75,12 @@ func newTagsForCtx(ctx context.Context) context.Context {
 	return SetInContext(ctx, t)
 }
 
-func setRequestFieldTags(ctx context.Context, f RequestFieldExtractorFunc, fullMethodName string, req interface{}) {
-	if valMap := f(fullMethodName, req); valMap != nil {
+func setRequestFieldTags(ctx context.Context, f RequestFieldExtractorWithContextFunc, fullMethodName string, req interface{}) {
+	if valMap := f(ctx, fullMethodName, req); valMap != nil {
 		t := Extract(ctx)
 		for k, v := range valMap {
 			t.Set("grpc.request."+k, v)
 		}
 	}
 }
+

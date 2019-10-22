@@ -4,13 +4,17 @@
 package grpc_ctxtags
 
 import (
+	"context"
 	"reflect"
+	"strings"
+
+	"google.golang.org/grpc/metadata"
 )
 
-// RequestFieldExtractorFunc is a user-provided function that extracts field information from a gRPC request.
+// RequestFieldExtractorWithContextFunc is a user-provided function that extracts field information from a gRPC request.
 // It is called from tags middleware on arrival of unary request or a server-stream request.
 // Keys and values will be added to the context tags of the request. If there are no fields, you should return a nil.
-type RequestFieldExtractorFunc func(fullMethod string, req interface{}) map[string]interface{}
+type RequestFieldExtractorWithContextFunc func(ctx context.Context, fullMethod string, req interface{}) map[string]interface{}
 
 type requestFieldsExtractor interface {
 	// ExtractRequestFields is a method declared on a Protobuf message that extracts fields from the interface.
@@ -20,7 +24,7 @@ type requestFieldsExtractor interface {
 
 // CodeGenRequestFieldExtractor is a function that relies on code-generated functions that export log fields from requests.
 // These are usually coming from a protoc-plugin that generates additional information based on custom field options.
-func CodeGenRequestFieldExtractor(fullMethod string, req interface{}) map[string]interface{} {
+func CodeGenRequestFieldExtractor(_ context.Context, fullMethod string, req interface{}) map[string]interface{} {
 	if ext, ok := req.(requestFieldsExtractor); ok {
 		retMap := make(map[string]interface{})
 		ext.ExtractRequestFields(retMap)
@@ -40,8 +44,8 @@ func CodeGenRequestFieldExtractor(fullMethod string, req interface{}) map[string
 //  }
 //
 // The tagName is configurable using the tagName variable. Here it would be "log_field".
-func TagBasedRequestFieldExtractor(tagName string) RequestFieldExtractorFunc {
-	return func(fullMethod string, req interface{}) map[string]interface{} {
+func TagBasedRequestFieldExtractor(tagName string) RequestFieldExtractorWithContextFunc {
+	return func(_ context.Context, fullMethod string, req interface{}) map[string]interface{} {
 		retMap := make(map[string]interface{})
 		reflectMessageTags(req, retMap, tagName)
 		if len(retMap) == 0 {
@@ -82,4 +86,18 @@ func reflectMessageTags(msg interface{}, existingMap map[string]interface{}, tag
 		}
 	}
 	return
+}
+
+func TagBasedRequestMetadataExtractor(prefix string, fields ...string) RequestFieldExtractorWithContextFunc {
+	return func(ctx context.Context, _ string, _ interface{}) map[string]interface{} {
+		if ctxMd, ok := metadata.FromIncomingContext(ctx); ok {
+			tags := Extract(ctx)
+			for _, field := range fields {
+				if values, present := ctxMd[field]; present {
+					tags = tags.Set(prefix+field, strings.Join(values, ","))
+				}
+			}
+		}
+		return nil
+	}
 }

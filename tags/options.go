@@ -10,7 +10,7 @@ var (
 )
 
 type options struct {
-	requestFieldsFunc        RequestFieldExtractorFunc
+	requestFieldsFunc        RequestFieldExtractorWithContextFunc
 	requestFieldsFromInitial bool
 }
 
@@ -27,7 +27,7 @@ type Option func(*options)
 
 // WithFieldExtractor customizes the function for extracting log fields from protobuf messages, for
 // unary and server-streamed methods only.
-func WithFieldExtractor(f RequestFieldExtractorFunc) Option {
+func WithFieldExtractor(f RequestFieldExtractorWithContextFunc) Option {
 	return func(o *options) {
 		o.requestFieldsFunc = f
 	}
@@ -36,7 +36,7 @@ func WithFieldExtractor(f RequestFieldExtractorFunc) Option {
 // WithFieldExtractorForInitialReq customizes the function for extracting log fields from protobuf messages,
 // for all unary and streaming methods. For client-streams and bidirectional-streams, the tags will be
 // extracted from the first message from the client.
-func WithFieldExtractorForInitialReq(f RequestFieldExtractorFunc) Option {
+func WithFieldExtractorForInitialReq(f RequestFieldExtractorWithContextFunc) Option {
 	return func(o *options) {
 		o.requestFieldsFunc = f
 		o.requestFieldsFromInitial = true
