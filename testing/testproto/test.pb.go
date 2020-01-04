@@ -8,8 +8,6 @@ import (
 	fmt "fmt"
 	proto "github.com/golang/protobuf/proto"
 	grpc "google.golang.org/grpc"
-	codes "google.golang.org/grpc/codes"
-	status "google.golang.org/grpc/status"
 	math "math"
 )
 
@@ -313,26 +311,6 @@ type TestServiceServer interface {
 	PingError(context.Context, *PingRequest) (*Empty, error)
 	PingList(*PingRequest, TestService_PingListServer) error
 	PingStream(TestService_PingStreamServer) error
-}
-
-// UnimplementedTestServiceServer can be embedded to have forward compatible implementations.
-type UnimplementedTestServiceServer struct {
-}
-
-func (*UnimplementedTestServiceServer) PingEmpty(ctx context.Context, req *Empty) (*PingResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method PingEmpty not implemented")
-}
-func (*UnimplementedTestServiceServer) Ping(ctx context.Context, req *PingRequest) (*PingResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Ping not implemented")
-}
-func (*UnimplementedTestServiceServer) PingError(ctx context.Context, req *PingRequest) (*Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method PingError not implemented")
-}
-func (*UnimplementedTestServiceServer) PingList(req *PingRequest, srv TestService_PingListServer) error {
-	return status.Errorf(codes.Unimplemented, "method PingList not implemented")
-}
-func (*UnimplementedTestServiceServer) PingStream(srv TestService_PingStreamServer) error {
-	return status.Errorf(codes.Unimplemented, "method PingStream not implemented")
 }
 
 func RegisterTestServiceServer(s *grpc.Server, srv TestServiceServer) {
