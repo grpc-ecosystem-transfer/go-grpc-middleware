@@ -51,14 +51,14 @@ func (s *InterceptorTestSuite) SetupSuite() {
 	s.restartServerWithDelayedStart = make(chan time.Duration)
 	s.serverRunning = make(chan bool)
 
-	s.serverAddr = "127.0.0.1:0"
+	s.serverAddr = ":0"
 
 	go func() {
 		for {
 			var err error
 			s.ServerListener, err = net.Listen("tcp", s.serverAddr)
-			s.serverAddr = s.ServerListener.Addr().String()
 			require.NoError(s.T(), err, "must be able to allocate a port for serverListener")
+			s.serverAddr = s.ServerListener.Addr().String()
 			if *flagTls {
 				localhostCert, err := tls.X509KeyPair(certs.LocalhostCert, certs.LocalhostKey)
 				require.NoError(s.T(), err, "failed loading server credentials for localhostCert")
