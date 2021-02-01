@@ -3,6 +3,7 @@ package metrics
 import (
 	"context"
 	"io"
+	"log"
 	"net"
 	"testing"
 	"time"
@@ -38,7 +39,9 @@ type ClientInterceptorTestSuite struct {
 func (s *ClientInterceptorTestSuite) SetupSuite() {
 	var err error
 
-	DefaultClientMetrics.EnableClientHandlingTimeHistogram()
+	// Make all RPC calls last at most 2 sec, meaning all async issues or deadlock will not kill tests.
+	s.ctx, s.cancel = context.WithTimeout(context.TODO(), 2*time.Second)
+	_ = DefaultClientMetrics.EnableClientHandlingTimeHistogram()
 
 	s.serverListener, err = net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(s.T(), err, "must be able to allocate a port for serverListener")
@@ -48,23 +51,23 @@ func (s *ClientInterceptorTestSuite) SetupSuite() {
 	pb_testproto.RegisterTestServiceServer(s.server, &testService{t: s.T()})
 
 	go func() {
-		s.server.Serve(s.serverListener)
+		if err := s.server.Serve(s.serverListener); err != nil {
+			log.Fatalf("%v", err)
+		}
 	}()
 
-	s.clientConn, err = grpc.Dial(
+	s.clientConn, err = grpc.DialContext(
+		s.ctx,
 		s.serverListener.Addr().String(),
 		grpc.WithInsecure(),
 		grpc.WithBlock(),
 		grpc.WithUnaryInterceptor(UnaryClientInterceptor(prometheus.DefaultRegisterer)),
-		grpc.WithStreamInterceptor(StreamClientInterceptor(prometheus.DefaultRegisterer)),
-		grpc.WithTimeout(2*time.Second))
+		grpc.WithStreamInterceptor(StreamClientInterceptor(prometheus.DefaultRegisterer)))
 	require.NoError(s.T(), err, "must not error on client Dial")
 	s.testClient = pb_testproto.NewTestServiceClient(s.clientConn)
 }
 
 func (s *ClientInterceptorTestSuite) SetupTest() {
-	// Make all RPC calls last at most 2 sec, meaning all async issues or deadlock will not kill tests.
-	s.ctx, s.cancel = context.WithTimeout(context.TODO(), 2*time.Second)
 
 	// Make sure every test starts with same fresh, intialized metric state.
 	DefaultClientMetrics.clientStartedCounter.Reset()

@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -54,7 +55,10 @@ type ServerInterceptorTestSuite struct {
 func (s *ServerInterceptorTestSuite) SetupSuite() {
 	var err error
 
-	DefaultServerMetrics.EnableHandlingTimeHistogram()
+	// Make all RPC calls last at most 2 sec, meaning all async issues or deadlock will not kill tests.
+	s.ctx, s.cancel = context.WithTimeout(context.TODO(), 2*time.Second)
+
+	_ = DefaultServerMetrics.EnableHandlingTimeHistogram()
 
 	s.serverListener, err = net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(s.T(), err, "must be able to allocate a port for serverListener")
@@ -67,18 +71,17 @@ func (s *ServerInterceptorTestSuite) SetupSuite() {
 	pb_testproto.RegisterTestServiceServer(s.server, &testService{t: s.T()})
 
 	go func() {
-		s.server.Serve(s.serverListener)
+		if err := s.server.Serve(s.serverListener); err != nil {
+			log.Fatalf("%v", err)
+		}
 	}()
 
-	s.clientConn, err = grpc.Dial(s.serverListener.Addr().String(), grpc.WithInsecure(), grpc.WithBlock(), grpc.WithTimeout(2*time.Second))
+	s.clientConn, err = grpc.DialContext(s.ctx, s.serverListener.Addr().String(), grpc.WithInsecure(), grpc.WithBlock())
 	require.NoError(s.T(), err, "must not error on client Dial")
 	s.testClient = pb_testproto.NewTestServiceClient(s.clientConn)
 }
 
 func (s *ServerInterceptorTestSuite) SetupTest() {
-	// Make all RPC calls last at most 2 sec, meaning all async issues or deadlock will not kill tests.
-	s.ctx, s.cancel = context.WithTimeout(context.TODO(), 2*time.Second)
-
 	// Make sure every test starts with same fresh, intialized metric state.
 	DefaultServerMetrics.serverStartedCounter.Reset()
 	DefaultServerMetrics.serverHandledCounter.Reset()
@@ -248,7 +251,9 @@ func (s *testService) PingList(ping *pb_testproto.PingListRequest, stream pb_tes
 	}
 	// Send user trailers and headers.
 	for i := 0; i < countListResponses; i++ {
-		stream.Send(&pb_testproto.PingListResponse{Value: ping.Value, Counter: int32(i)})
+		if err := stream.Send(&pb_testproto.PingListResponse{Value: ping.Value, Counter: int32(i)}); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -284,7 +289,9 @@ func toFloat64HistCount(h prometheus.Observer) uint64 {
 	}
 
 	pb := &dto.Metric{}
-	m.Write(pb)
+	if err := m.Write(pb); err != nil {
+		panic(err)
+	}
 	if pb.Histogram != nil {
 		return pb.Histogram.GetSampleCount()
 	}
