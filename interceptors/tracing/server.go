@@ -5,6 +5,7 @@ package tracing
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/opentracing/opentracing-go"
@@ -13,8 +14,9 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/grpclog"
 
+	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
+
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors"
-	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/tags"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/util/metautils"
 )
 
@@ -22,19 +24,18 @@ var (
 	grpcTag = opentracing.Tag{Key: string(ext.Component), Value: "gRPC"}
 )
 
-type opentracingServerReporter struct {
-	ctx             context.Context
-	typ             interceptors.GRPCType
-	service, method string
+type serverReporter struct {
+	ctx context.Context
+	interceptors.CallMeta
 
 	serverSpan opentracing.Span
 }
 
-func (o *opentracingServerReporter) PostCall(err error, _ time.Duration) {
-	// Finish span and log context information.
-	tags := tags.Extract(o.ctx)
-	for k, v := range tags.Values() {
-		o.serverSpan.SetTag(k, v)
+func (o *serverReporter) PostCall(err error, _ time.Duration) {
+	// Finish span and extract logging context information for richer spans.
+	fieldIter := logging.ExtractFields(o.ctx).Iter()
+	for fieldIter.Next() {
+		o.serverSpan.SetTag(fieldIter.At())
 	}
 	if err != nil {
 		ext.Error.Set(o.serverSpan, true)
@@ -43,37 +44,40 @@ func (o *opentracingServerReporter) PostCall(err error, _ time.Duration) {
 	o.serverSpan.Finish()
 }
 
-func (o *opentracingServerReporter) PostMsgSend(interface{}, error, time.Duration) {}
+func (o *serverReporter) PostMsgSend(interface{}, error, time.Duration) {}
 
-func (o *opentracingServerReporter) PostMsgReceive(interface{}, error, time.Duration) {}
+func (o *serverReporter) PostMsgReceive(interface{}, error, time.Duration) {}
 
-type opentracingServerReportable struct {
-	tracer opentracing.Tracer
-	// This is only used for server. TODO: Investigate if needed in client.
+type serverReportable struct {
+	tracer          opentracing.Tracer
 	traceHeaderName string
 	filterOutFunc   FilterFunc
 }
 
-func (o *opentracingServerReportable) ServerReporter(ctx context.Context, _ interface{}, typ interceptors.GRPCType, service string, method string) (interceptors.Reporter, context.Context) {
-	if o.filterOutFunc != nil && !o.filterOutFunc(ctx, interceptors.FullMethod(service, method)) {
+func (o *serverReportable) ServerReporter(ctx context.Context, c interceptors.CallMeta) (interceptors.Reporter, context.Context) {
+	if o.filterOutFunc != nil && !o.filterOutFunc(ctx, c.FullMethod()) {
 		return interceptors.NoopReporter{}, ctx
 	}
 
-	newCtx, serverSpan := newServerSpanFromInbound(ctx, o.tracer, o.traceHeaderName, interceptors.FullMethod(service, method))
-	mock := &opentracingServerReporter{ctx: newCtx, typ: typ, service: service, method: method, serverSpan: serverSpan}
+	newCtx, serverSpan := newServerSpanFromInbound(ctx, o.tracer, o.traceHeaderName, c.FullMethod())
+	mock := &serverReporter{
+		ctx:        newCtx,
+		CallMeta:   c,
+		serverSpan: serverSpan,
+	}
 	return mock, newCtx
 }
 
 // UnaryServerInterceptor returns a new unary server interceptor for OpenTracing.
 func UnaryServerInterceptor(opts ...Option) grpc.UnaryServerInterceptor {
 	o := evaluateOptions(opts)
-	return interceptors.UnaryServerInterceptor(&opentracingServerReportable{tracer: o.tracer, traceHeaderName: o.traceHeaderName, filterOutFunc: o.filterOutFunc})
+	return interceptors.UnaryServerInterceptor(&serverReportable{tracer: o.tracer, traceHeaderName: o.traceHeaderName, filterOutFunc: o.filterOutFunc})
 }
 
 // StreamServerInterceptor returns a new streaming server interceptor for OpenTracing.
 func StreamServerInterceptor(opts ...Option) grpc.StreamServerInterceptor {
 	o := evaluateOptions(opts)
-	return interceptors.StreamServerInterceptor(&opentracingServerReportable{tracer: o.tracer, traceHeaderName: o.traceHeaderName, filterOutFunc: o.filterOutFunc})
+	return interceptors.StreamServerInterceptor(&serverReportable{tracer: o.tracer, traceHeaderName: o.traceHeaderName, filterOutFunc: o.filterOutFunc})
 }
 
 func newServerSpanFromInbound(ctx context.Context, tracer opentracing.Tracer, traceHeaderName, fullMethodName string) (context.Context, opentracing.Span) {
@@ -85,11 +89,15 @@ func newServerSpanFromInbound(ctx context.Context, tracer opentracing.Tracer, tr
 
 	serverSpan := tracer.StartSpan(
 		fullMethodName,
-		// this is magical, it attaches the new span to the parent parentSpanContext, and creates an unparented one if empty.
+		// This is magical, it attaches the new span to the parent parentSpanContext, and creates an unparented one if empty.
 		ext.RPCServerOption(parentSpanContext),
 		grpcTag,
 	)
 
-	injectOpentracingIdsToTags(traceHeaderName, serverSpan, tags.Extract(ctx))
+	meta := getTraceMeta(traceHeaderName, serverSpan)
+
+	// Logging fields are used as input for span finish tags. We also want request/trace ID to be part of logging.
+	// Use logging fields to preserve this information.
+	ctx = logging.InjectFields(ctx, logging.Fields{FieldTraceID, meta.TraceID, FieldSpanID, meta.SpanID, FieldSampled, fmt.Sprintf("%v", meta.Sampled)})
 	return opentracing.ContextWithSpan(ctx, serverSpan), serverSpan
 }

@@ -21,14 +21,15 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 
-	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/tags"
+	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
+
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/tracing"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/testing/testpb"
 )
 
 var (
-	fakeInboundTraceId = 1337
-	fakeInboundSpanId  = 999
+	fakeInboundTraceId = "1337"
+	fakeInboundSpanId  = "999"
 	traceHeaderName    = "uber-trace-id"
 )
 
@@ -39,11 +40,7 @@ type tracingAssertService struct {
 
 func (s *tracingAssertService) Ping(ctx context.Context, ping *testpb.PingRequest) (*testpb.PingResponse, error) {
 	assert.NotNil(s.T, opentracing.SpanFromContext(ctx), "handlers must have the spancontext in their context, otherwise propagation will fail")
-	tags := tags.Extract(ctx)
-	assert.True(s.T, tags.Has(tracing.TagTraceId), "tags must contain traceid")
-	assert.True(s.T, tags.Has(tracing.TagSpanId), "tags must contain spanid")
-	assert.True(s.T, tags.Has(tracing.TagSampled), "tags must contain sampled")
-	assert.Equal(s.T, tags.Values()[tracing.TagSampled], "true", "sampled must be set to true")
+	assert.Equal(s.T, []string{tracing.FieldTraceID, fakeInboundTraceId, tracing.FieldSpanID, fakeInboundSpanId, tracing.FieldSampled, "true"}, logging.ExtractFields(ctx))
 	return s.TestServiceServer.Ping(ctx, ping)
 }
 
@@ -54,25 +51,17 @@ func (s *tracingAssertService) PingError(ctx context.Context, ping *testpb.PingE
 
 func (s *tracingAssertService) PingList(ping *testpb.PingListRequest, stream testpb.TestService_PingListServer) error {
 	assert.NotNil(s.T, opentracing.SpanFromContext(stream.Context()), "handlers must have the spancontext in their context, otherwise propagation will fail")
-	tags := tags.Extract(stream.Context())
-	assert.True(s.T, tags.Has(tracing.TagTraceId), "tags must contain traceid")
-	assert.True(s.T, tags.Has(tracing.TagSpanId), "tags must contain spanid")
-	assert.True(s.T, tags.Has(tracing.TagSampled), "tags must contain sampled")
-	assert.Equal(s.T, tags.Values()[tracing.TagSampled], "true", "sampled must be set to true")
+	assert.Equal(s.T, []string{tracing.FieldTraceID, fakeInboundTraceId, tracing.FieldSpanID, fakeInboundSpanId, tracing.FieldSampled, "true"}, logging.ExtractFields(stream.Context()))
 	return s.TestServiceServer.PingList(ping, stream)
 }
 
 func (s *tracingAssertService) PingEmpty(ctx context.Context, empty *testpb.PingEmptyRequest) (*testpb.PingEmptyResponse, error) {
 	assert.NotNil(s.T, opentracing.SpanFromContext(ctx), "handlers must have the spancontext in their context, otherwise propagation will fail")
-	tags := tags.Extract(ctx)
-	assert.True(s.T, tags.Has(tracing.TagTraceId), "tags must contain traceid")
-	assert.True(s.T, tags.Has(tracing.TagSpanId), "tags must contain spanid")
-	assert.True(s.T, tags.Has(tracing.TagSampled), "tags must contain sampled")
-	assert.Equal(s.T, tags.Values()[tracing.TagSampled], "false", "sampled must be set to false")
+	assert.Equal(s.T, []string{tracing.FieldTraceID, fakeInboundTraceId, tracing.FieldSpanID, fakeInboundSpanId, tracing.FieldSampled, "true"}, logging.ExtractFields(ctx))
 	return s.TestServiceServer.PingEmpty(ctx, empty)
 }
 
-func TestTaggingSuite(t *testing.T) {
+func TestTracingSuite(t *testing.T) {
 	mockTracer := mocktracer.New()
 	opts := []tracing.Option{
 		tracing.WithTracer(mockTracer),
@@ -85,7 +74,7 @@ func TestTaggingSuite(t *testing.T) {
 	suite.Run(t, s)
 }
 
-func TestTaggingSuiteJaeger(t *testing.T) {
+func TestTracingSuiteJaeger(t *testing.T) {
 	mockTracer := mocktracer.New()
 	mockTracer.RegisterInjector(opentracing.HTTPHeaders, jaegerFormatInjector{})
 	mockTracer.RegisterExtractor(opentracing.HTTPHeaders, jaegerFormatExtractor{})
@@ -107,12 +96,8 @@ func makeInterceptorTestSuite(t *testing.T, opts []tracing.Option) *testpb.Inter
 			grpc.WithStreamInterceptor(tracing.StreamClientInterceptor(opts...)),
 		},
 		ServerOpts: []grpc.ServerOption{
-			grpc.ChainStreamInterceptor(
-				tags.StreamServerInterceptor(tags.WithFieldExtractor(tags.CodeGenRequestFieldExtractor)),
-				tracing.StreamServerInterceptor(opts...)),
-			grpc.ChainUnaryInterceptor(
-				tags.UnaryServerInterceptor(tags.WithFieldExtractor(tags.CodeGenRequestFieldExtractor)),
-				tracing.UnaryServerInterceptor(opts...)),
+			grpc.StreamInterceptor(tracing.StreamServerInterceptor(opts...)),
+			grpc.UnaryInterceptor(tracing.UnaryServerInterceptor(opts...)),
 		},
 	}
 }
@@ -133,9 +118,9 @@ func (s *OpentracingSuite) createContextFromFakeHttpRequestParent(ctx context.Co
 	}
 
 	hdr := http.Header{}
-	hdr.Set(traceHeaderName, fmt.Sprintf("%d:%d:%d:%d", fakeInboundTraceId, fakeInboundSpanId, fakeInboundSpanId, jFlag))
-	hdr.Set("mockpfx-ids-traceid", fmt.Sprint(fakeInboundTraceId))
-	hdr.Set("mockpfx-ids-spanid", fmt.Sprint(fakeInboundSpanId))
+	hdr.Set(traceHeaderName, fmt.Sprintf("%s:%s:%s:%d", fakeInboundTraceId, fakeInboundSpanId, fakeInboundSpanId, jFlag))
+	hdr.Set("mockpfx-ids-traceid", fakeInboundTraceId)
+	hdr.Set("mockpfx-ids-spanid", fakeInboundSpanId)
 	hdr.Set("mockpfx-ids-sampled", fmt.Sprint(sampled))
 
 	parentSpanContext, err := s.mockTracer.Extract(opentracing.HTTPHeaders, opentracing.HTTPHeadersCarrier(hdr))
@@ -155,7 +140,7 @@ func (s *OpentracingSuite) assertTracesCreated(methodName string) (clientSpan *m
 		s.T().Logf("span: %v, tags: %v", span, span.Tags())
 	}
 	require.Len(s.T(), spans, 3, "should record 3 spans: one fake inbound, one client, one server")
-	traceIdAssert := fmt.Sprintf("traceId=%d", fakeInboundTraceId)
+	traceIdAssert := fmt.Sprintf("traceId=%s", fakeInboundTraceId)
 	for _, span := range spans {
 		assert.Contains(s.T(), span.String(), traceIdAssert, "not part of the fake parent trace: %v", span)
 		if span.OperationName == methodName {

@@ -16,7 +16,7 @@ import (
 func UnaryClientInterceptor(reportable ClientReportable) grpc.UnaryClientInterceptor {
 	return func(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
 		r := newReport(Unary, method)
-		reporter, newCtx := reportable.ClientReporter(ctx, req, r.rpcType, r.service, r.method)
+		reporter, newCtx := reportable.ClientReporter(ctx, CallMeta{ReqProtoOrNil: req, Typ: r.rpcType, Service: r.service, Method: r.method})
 
 		reporter.PostMsgSend(req, nil, time.Since(r.startTime))
 		err := invoker(newCtx, method, req, reply, cc, opts...)
@@ -31,7 +31,7 @@ func UnaryClientInterceptor(reportable ClientReportable) grpc.UnaryClientInterce
 func StreamClientInterceptor(reportable ClientReportable) grpc.StreamClientInterceptor {
 	return func(ctx context.Context, desc *grpc.StreamDesc, cc *grpc.ClientConn, method string, streamer grpc.Streamer, opts ...grpc.CallOption) (grpc.ClientStream, error) {
 		r := newReport(clientStreamType(desc), method)
-		reporter, newCtx := reportable.ClientReporter(ctx, nil, r.rpcType, r.service, r.method)
+		reporter, newCtx := reportable.ClientReporter(ctx, CallMeta{ReqProtoOrNil: nil, Typ: r.rpcType, Service: r.service, Method: r.method})
 
 		clientStream, err := streamer(newCtx, desc, cc, method, opts...)
 		if err != nil {

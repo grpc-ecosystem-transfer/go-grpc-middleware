@@ -91,9 +91,7 @@ func (s *ServerInterceptorTestSuite) TestUnaryReporting() {
 	_, err := s.testClient.PingEmpty(s.ctx, &testpb.PingEmptyRequest{}) // should return with code=OK
 	require.NoError(s.T(), err)
 	s.mock.Equal(s.T(), []*mockReport{{
-		typ:             Unary,
-		svcName:         testpb.TestServiceFullName,
-		methodName:      "PingEmpty",
+		CallMeta:        CallMeta{Typ: Unary, Service: testpb.TestServiceFullName, Method: "PingEmpty"},
 		postCalls:       []error{nil},
 		postMsgReceives: []error{nil},
 		postMsgSends:    []error{nil},
@@ -103,9 +101,7 @@ func (s *ServerInterceptorTestSuite) TestUnaryReporting() {
 	_, err = s.testClient.PingError(s.ctx, &testpb.PingErrorRequest{ErrorCodeReturned: uint32(codes.FailedPrecondition)}) // should return with code=FailedPrecondition
 	require.Error(s.T(), err)
 	s.mock.Equal(s.T(), []*mockReport{{
-		typ:             Unary,
-		svcName:         testpb.TestServiceFullName,
-		methodName:      "PingError",
+		CallMeta:        CallMeta{Typ: Unary, Service: testpb.TestServiceFullName, Method: "PingError"},
 		postCalls:       []error{status.Errorf(codes.FailedPrecondition, "Userspace error.")},
 		postMsgReceives: []error{nil},
 		postMsgSends:    []error{status.Errorf(codes.FailedPrecondition, "Userspace error.")},
@@ -126,9 +122,7 @@ func (s *ServerInterceptorTestSuite) TestStreamingReports() {
 	}
 	require.EqualValues(s.T(), testpb.ListResponseCount, count, "Number of received msg on the wire must match")
 	s.mock.Equal(s.T(), []*mockReport{{
-		typ:             ServerStream,
-		svcName:         testpb.TestServiceFullName,
-		methodName:      "PingList",
+		CallMeta:        CallMeta{Typ: ServerStream, Service: testpb.TestServiceFullName, Method: "PingList"},
 		postCalls:       []error{nil},
 		postMsgReceives: []error{nil},
 		postMsgSends:    make([]error, testpb.ListResponseCount),
@@ -139,9 +133,7 @@ func (s *ServerInterceptorTestSuite) TestStreamingReports() {
 	require.NoError(s.T(), err, "PingList must not fail immediately")
 
 	s.mock.requireOneReportWithRetry(s.ctx, s.T(), &mockReport{
-		typ:             ServerStream,
-		svcName:         testpb.TestServiceFullName,
-		methodName:      "PingList",
+		CallMeta:        CallMeta{Typ: ServerStream, Service: testpb.TestServiceFullName, Method: "PingList"},
 		postCalls:       []error{status.Errorf(codes.FailedPrecondition, "foobar")},
 		postMsgReceives: []error{nil},
 	})
@@ -183,9 +175,7 @@ func (s *ServerInterceptorTestSuite) TestBiStreamingReporting() {
 	require.EqualValues(s.T(), count, 100, "Number of received msg on the wire must match")
 
 	s.mock.Equal(s.T(), []*mockReport{{
-		typ:             BidiStream,
-		svcName:         testpb.TestServiceFullName,
-		methodName:      "PingStream",
+		CallMeta:        CallMeta{Typ: BidiStream, Service: testpb.TestServiceFullName, Method: "PingStream"},
 		postCalls:       []error{nil},
 		postMsgReceives: append(make([]error, 100), io.EOF),
 		postMsgSends:    make([]error, 100),

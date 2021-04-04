@@ -18,7 +18,8 @@ import (
 
 const (
 	// ListResponseCount is the expected number of responses to PingList
-	ListResponseCount = 100
+	ListResponseCount   = 100
+	TestServiceFullName = "testing.testpb.v1.TestService"
 )
 
 // Interface implementation assert.

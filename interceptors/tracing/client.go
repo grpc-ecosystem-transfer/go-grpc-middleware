@@ -18,14 +18,13 @@ import (
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/util/metautils"
 )
 
-type opentracingClientReporter struct {
-	typ                 interceptors.GRPCType
-	svcName, methodName string
+type clientReporter struct {
+	interceptors.CallMeta
 
 	clientSpan opentracing.Span
 }
 
-func (o *opentracingClientReporter) PostCall(err error, _ time.Duration) {
+func (o *clientReporter) PostCall(err error, _ time.Duration) {
 	// Finish span.
 	if err != nil && err != io.EOF {
 		ext.Error.Set(o.clientSpan, true)
@@ -34,35 +33,37 @@ func (o *opentracingClientReporter) PostCall(err error, _ time.Duration) {
 	o.clientSpan.Finish()
 }
 
-func (o *opentracingClientReporter) PostMsgSend(interface{}, error, time.Duration) {}
+func (o *clientReporter) PostMsgSend(interface{}, error, time.Duration) {}
 
-func (o *opentracingClientReporter) PostMsgReceive(interface{}, error, time.Duration) {}
+func (o *clientReporter) PostMsgReceive(interface{}, error, time.Duration) {}
 
-type opentracingClientReportable struct {
+type clientReportable struct {
 	tracer        opentracing.Tracer
 	filterOutFunc FilterFunc
 }
 
-func (o *opentracingClientReportable) ClientReporter(ctx context.Context, _ interface{}, typ interceptors.GRPCType, service string, method string) (interceptors.Reporter, context.Context) {
-	if o.filterOutFunc != nil && !o.filterOutFunc(ctx, method) {
+func (o *clientReportable) ClientReporter(ctx context.Context, c interceptors.CallMeta) (interceptors.Reporter, context.Context) {
+	if o.filterOutFunc != nil && !o.filterOutFunc(ctx, c.FullMethod()) {
 		return interceptors.NoopReporter{}, ctx
 	}
-
-	newCtx, clientSpan := newClientSpanFromContext(ctx, o.tracer, interceptors.FullMethod(service, method))
-	mock := &opentracingClientReporter{typ: typ, svcName: service, methodName: method, clientSpan: clientSpan}
+	newCtx, clientSpan := newClientSpanFromContext(ctx, o.tracer, c.FullMethod())
+	mock := &clientReporter{
+		CallMeta:   c,
+		clientSpan: clientSpan,
+	}
 	return mock, newCtx
 }
 
 // UnaryClientInterceptor returns a new unary client interceptor for OpenTracing.
 func UnaryClientInterceptor(opts ...Option) grpc.UnaryClientInterceptor {
 	o := evaluateOptions(opts)
-	return interceptors.UnaryClientInterceptor(&opentracingClientReportable{tracer: o.tracer, filterOutFunc: o.filterOutFunc})
+	return interceptors.UnaryClientInterceptor(&clientReportable{tracer: o.tracer, filterOutFunc: o.filterOutFunc})
 }
 
 // StreamClientInterceptor returns a new streaming client interceptor for OpenTracing.
 func StreamClientInterceptor(opts ...Option) grpc.StreamClientInterceptor {
 	o := evaluateOptions(opts)
-	return interceptors.StreamClientInterceptor(&opentracingClientReportable{tracer: o.tracer, filterOutFunc: o.filterOutFunc})
+	return interceptors.StreamClientInterceptor(&clientReportable{tracer: o.tracer, filterOutFunc: o.filterOutFunc})
 }
 
 // ClientAddContextTags returns a context with specified opentracing tags, which

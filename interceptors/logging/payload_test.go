@@ -15,7 +15,6 @@ import (
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
-	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/tags"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/testing/testpb"
 )
 
@@ -40,12 +39,8 @@ func TestPayloadSuite(t *testing.T) {
 		grpc.WithStreamInterceptor(logging.PayloadStreamClientInterceptor(s.logger, alwaysLoggingDeciderClient)),
 	}
 	s.InterceptorTestSuite.ServerOpts = []grpc.ServerOption{
-		grpc.ChainStreamInterceptor(
-			tags.StreamServerInterceptor(tags.WithFieldExtractor(tags.CodeGenRequestFieldExtractor)),
-			logging.PayloadStreamServerInterceptor(s.logger, alwaysLoggingDeciderServer)),
-		grpc.ChainUnaryInterceptor(
-			tags.UnaryServerInterceptor(tags.WithFieldExtractor(tags.CodeGenRequestFieldExtractor)),
-			logging.PayloadUnaryServerInterceptor(s.logger, alwaysLoggingDeciderServer)),
+		grpc.StreamInterceptor(logging.PayloadStreamServerInterceptor(s.logger, alwaysLoggingDeciderServer)),
+		grpc.UnaryInterceptor(logging.PayloadUnaryServerInterceptor(s.logger, alwaysLoggingDeciderServer)),
 	}
 	suite.Run(t, s)
 }
@@ -70,10 +65,10 @@ func (s *loggingPayloadSuite) assertPayloadLogLinesForMessage(lines LogLines, me
 		assert.Equal(s.T(), logging.INFO, clientRequestLogLine.lvl)
 		assert.Equal(s.T(), "request payload logged as grpc.request.content field", clientRequestLogLine.msg)
 		clientRequestFields := assertStandardFields(s.T(), logging.KindClientFieldValue, clientRequestLogLine.fields, method, typ)
-		clientRequestFields.AssertNextFieldNotEmpty(s.T(), "grpc.start_time").
-			AssertNextFieldNotEmpty(s.T(), "grpc.send.duration").
-			AssertNextField(s.T(), "grpc.request.content", `{"value":"something","sleepTimeMs":9999}`).
-			AssertNextFieldNotEmpty(s.T(), "grpc.request.deadline").AssertNoMoreTags(s.T())
+		clientRequestFields.AssertFieldNotEmpty(s.T(), "grpc.start_time").
+			AssertFieldNotEmpty(s.T(), "grpc.send.duration").
+			AssertField(s.T(), "grpc.request.content", `{"value":"something","sleepTimeMs":9999}`).
+			AssertFieldNotEmpty(s.T(), "grpc.request.deadline").AssertNoMoreTags(s.T())
 	}
 	curr += repetitions
 	for i := curr; i < curr+repetitions; i++ {
@@ -81,13 +76,13 @@ func (s *loggingPayloadSuite) assertPayloadLogLinesForMessage(lines LogLines, me
 		assert.Equal(s.T(), logging.INFO, clientResponseLogLine.lvl)
 		assert.Equal(s.T(), "response payload logged as grpc.response.content field", clientResponseLogLine.msg)
 		clientResponseFields := assertStandardFields(s.T(), logging.KindClientFieldValue, clientResponseLogLine.fields, method, typ)
-		clientResponseFields = clientResponseFields.AssertNextFieldNotEmpty(s.T(), "grpc.start_time").
-			AssertNextFieldNotEmpty(s.T(), "grpc.recv.duration").
-			AssertNextFieldNotEmpty(s.T(), "grpc.request.deadline")
+		clientResponseFields = clientResponseFields.AssertFieldNotEmpty(s.T(), "grpc.start_time").
+			AssertFieldNotEmpty(s.T(), "grpc.recv.duration").
+			AssertFieldNotEmpty(s.T(), "grpc.request.deadline")
 		if i-curr == 0 {
-			clientResponseFields = clientResponseFields.AssertNextField(s.T(), "grpc.response.content", `{"value":"something"}`)
+			clientResponseFields = clientResponseFields.AssertField(s.T(), "grpc.response.content", `{"value":"something"}`)
 		} else {
-			clientResponseFields = clientResponseFields.AssertNextField(s.T(), "grpc.response.content", fmt.Sprintf(`{"value":"something","counter":%v}`, i-curr))
+			clientResponseFields = clientResponseFields.AssertField(s.T(), "grpc.response.content", fmt.Sprintf(`{"value":"something","counter":%v}`, i-curr))
 		}
 		clientResponseFields.AssertNoMoreTags(s.T())
 	}
@@ -97,12 +92,11 @@ func (s *loggingPayloadSuite) assertPayloadLogLinesForMessage(lines LogLines, me
 		assert.Equal(s.T(), logging.INFO, serverRequestLogLine.lvl)
 		assert.Equal(s.T(), "request payload logged as grpc.request.content field", serverRequestLogLine.msg)
 		serverRequestFields := assertStandardFields(s.T(), logging.KindServerFieldValue, serverRequestLogLine.fields, method, typ)
-		serverRequestFields.AssertNextField(s.T(), "grpc.request.value", "something").
-			AssertNextFieldNotEmpty(s.T(), "peer.address").
-			AssertNextFieldNotEmpty(s.T(), "grpc.start_time").
-			AssertNextFieldNotEmpty(s.T(), "grpc.recv.duration").
-			AssertNextFieldNotEmpty(s.T(), "grpc.request.deadline").
-			AssertNextField(s.T(), "grpc.request.content", `{"value":"something","sleepTimeMs":9999}`).AssertNoMoreTags(s.T())
+		serverRequestFields.AssertFieldNotEmpty(s.T(), "peer.address").
+			AssertFieldNotEmpty(s.T(), "grpc.start_time").
+			AssertFieldNotEmpty(s.T(), "grpc.recv.duration").
+			AssertFieldNotEmpty(s.T(), "grpc.request.deadline").
+			AssertField(s.T(), "grpc.request.content", `{"value":"something","sleepTimeMs":9999}`).AssertNoMoreTags(s.T())
 	}
 	curr += repetitions
 	for i := curr; i < curr+repetitions; i++ {
@@ -110,15 +104,14 @@ func (s *loggingPayloadSuite) assertPayloadLogLinesForMessage(lines LogLines, me
 		assert.Equal(s.T(), logging.INFO, serverResponseLogLine.lvl)
 		assert.Equal(s.T(), "response payload logged as grpc.response.content field", serverResponseLogLine.msg)
 		serverResponseFields := assertStandardFields(s.T(), logging.KindServerFieldValue, serverResponseLogLine.fields, method, typ)
-		serverResponseFields = serverResponseFields.AssertNextField(s.T(), "grpc.request.value", "something").
-			AssertNextFieldNotEmpty(s.T(), "peer.address").
-			AssertNextFieldNotEmpty(s.T(), "grpc.start_time").
-			AssertNextFieldNotEmpty(s.T(), "grpc.send.duration").
-			AssertNextFieldNotEmpty(s.T(), "grpc.request.deadline")
+		serverResponseFields = serverResponseFields.AssertFieldNotEmpty(s.T(), "peer.address").
+			AssertFieldNotEmpty(s.T(), "grpc.start_time").
+			AssertFieldNotEmpty(s.T(), "grpc.send.duration").
+			AssertFieldNotEmpty(s.T(), "grpc.request.deadline")
 		if i-curr == 0 {
-			serverResponseFields = serverResponseFields.AssertNextField(s.T(), "grpc.response.content", `{"value":"something"}`)
+			serverResponseFields = serverResponseFields.AssertField(s.T(), "grpc.response.content", `{"value":"something"}`)
 		} else {
-			serverResponseFields = serverResponseFields.AssertNextField(s.T(), "grpc.response.content", fmt.Sprintf(`{"value":"something","counter":%v}`, i-curr))
+			serverResponseFields = serverResponseFields.AssertField(s.T(), "grpc.response.content", fmt.Sprintf(`{"value":"something","counter":%v}`, i-curr))
 		}
 		serverResponseFields.AssertNoMoreTags(s.T())
 	}
@@ -136,10 +129,10 @@ func (s *loggingPayloadSuite) TestPingError_LogsOnlyRequestsOnError() {
 	assert.Equal(s.T(), "request payload logged as grpc.request.content field", clientRequestLogLine.msg)
 	clientRequestFields := assertStandardFields(s.T(), logging.KindClientFieldValue, clientRequestLogLine.fields, "PingError", interceptors.Unary)
 
-	clientRequestFields.AssertNextFieldNotEmpty(s.T(), "grpc.start_time").
-		AssertNextFieldNotEmpty(s.T(), "grpc.send.duration").
-		AssertNextField(s.T(), "grpc.request.content", `{"value":"something","errorCodeReturned":4}`).
-		AssertNextFieldNotEmpty(s.T(), "grpc.request.deadline").AssertNoMoreTags(s.T())
+	clientRequestFields.AssertFieldNotEmpty(s.T(), "grpc.start_time").
+		AssertFieldNotEmpty(s.T(), "grpc.send.duration").
+		AssertField(s.T(), "grpc.request.content", `{"value":"something","errorCodeReturned":4}`).
+		AssertFieldNotEmpty(s.T(), "grpc.request.deadline").AssertNoMoreTags(s.T())
 }
 
 func (s *loggingPayloadSuite) TestPingStream_LogsAllRequestsAndResponses() {

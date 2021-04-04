@@ -5,18 +5,16 @@ import (
 
 	"github.com/opentracing/opentracing-go"
 	"google.golang.org/grpc/grpclog"
-
-	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/tags"
 )
 
 const (
-	TagTraceId           = "trace.traceid"
-	TagSpanId            = "trace.spanid"
-	TagSampled           = "trace.sampled"
+	FieldTraceID         = "trace.traceid"
+	FieldSpanID          = "trace.spanid"
+	FieldSampled         = "trace.sampled"
 	jaegerNotSampledFlag = "0"
 )
 
-// injectOpentracingIdsToTags writes trace data to tags.
+// getTraceMeta returns trace hidden data from tracer.
 // This is done in an incredibly hacky way, because the public-facing interface of opentracing doesn't give access to
 // the TraceId and SpanId of the SpanContext. Only the Tracer's Inject/Extract methods know what these are.
 // Most tracers have them encoded as keys with 'traceid' and 'spanid':
@@ -26,58 +24,56 @@ const (
 // https://www.jaegertracing.io/docs/client-libraries/#trace-span-identity
 // Datadog uses keys ending with 'trace-id' and 'parent-id' (for span) by default:
 // https://github.com/DataDog/dd-trace-go/blob/v1/ddtrace/tracer/textmap.go#L77
-func injectOpentracingIdsToTags(traceHeaderName string, span opentracing.Span, tags tags.Tags) {
-	if err := span.Tracer().Inject(span.Context(), opentracing.HTTPHeaders,
-		&tagsCarrier{Tags: tags, traceHeaderName: traceHeaderName}); err != nil {
+func getTraceMeta(traceHeaderName string, span opentracing.Span) TraceMeta {
+	c := &mockedCarrier{traceHeaderName: traceHeaderName}
+	if err := span.Tracer().Inject(span.Context(), opentracing.HTTPHeaders, c); err != nil {
 		grpclog.Infof("grpc_opentracing: failed extracting trace info into ctx %v", err)
 	}
+	return c.m
 }
 
-// tagsCarrier is a really hacky way of
-type tagsCarrier struct {
-	tags.Tags
+type TraceMeta struct {
+	TraceID string
+	SpanID  string
+	Sampled bool
+}
+
+type mockedCarrier struct {
+	m               TraceMeta
 	traceHeaderName string
 }
 
-func (t *tagsCarrier) Set(key, val string) {
+func (c *mockedCarrier) Set(key, val string) {
 	key = strings.ToLower(key)
 
-	if key == t.traceHeaderName {
+	if key == c.traceHeaderName {
 		parts := strings.Split(val, ":")
 		if len(parts) == 4 {
-			t.Tags.Set(TagTraceId, parts[0])
-			t.Tags.Set(TagSpanId, parts[1])
+			c.m.TraceID = parts[0]
+			c.m.SpanID = parts[1]
 
-			if parts[3] != jaegerNotSampledFlag {
-				t.Tags.Set(TagSampled, "true")
-			} else {
-				t.Tags.Set(TagSampled, "false")
-			}
-
+			c.m.Sampled = parts[3] != jaegerNotSampledFlag
 			return
 		}
 	}
 
 	if strings.Contains(key, "traceid") {
-		t.Tags.Set(TagTraceId, val) // this will most likely be base-16 (hex) encoded
+		c.m.TraceID = val // This will most likely be base-16 (hex) encoded.
 	}
 
 	if strings.Contains(key, "spanid") && !strings.Contains(strings.ToLower(key), "parent") {
-		t.Tags.Set(TagSpanId, val) // this will most likely be base-16 (hex) encoded
+		c.m.SpanID = val // This will most likely be base-16 (hex) encoded.
 	}
 
 	if strings.Contains(key, "sampled") {
-		switch val {
-		case "true", "false":
-			t.Tags.Set(TagSampled, val)
-		}
+		c.m.Sampled = val == "true"
 	}
 
 	if strings.HasSuffix(key, "trace-id") {
-		t.Tags.Set(TagTraceId, val)
+		c.m.TraceID = val
 	}
 
 	if strings.HasSuffix(key, "parent-id") {
-		t.Tags.Set(TagSpanId, val)
+		c.m.SpanID = val
 	}
 }

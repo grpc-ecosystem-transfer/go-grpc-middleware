@@ -14,7 +14,7 @@ const (
 	binHdrSuffix = "-bin"
 )
 
-// metadataTextMap extends a metadata.MD to be an opentracing textmap
+// metadataTextMap extends a metadata.MD to be an opentracing textmap.
 type metadataTextMap metadata.MD
 
 // Set is a opentracing.TextMapReader interface that extracts values.

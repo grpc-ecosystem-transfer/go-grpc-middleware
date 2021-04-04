@@ -55,16 +55,34 @@ func SplitMethodName(fullMethod string) (string, string) {
 	return "unknown", "unknown"
 }
 
-func FullMethod(service, method string) string {
-	return fmt.Sprintf("/%s/%s", service, method)
+type CallMeta struct {
+	ReqProtoOrNil interface{}
+	Typ           GRPCType
+	Service       string
+	Method        string
+}
+
+func (c CallMeta) FullMethod() string {
+	return fmt.Sprintf("/%s/%s", c.Service, c.Method)
 }
 
 type ClientReportable interface {
-	ClientReporter(ctx context.Context, reqProtoOrNil interface{}, typ GRPCType, service string, method string) (Reporter, context.Context)
+	ClientReporter(context.Context, CallMeta) (Reporter, context.Context)
 }
 
 type ServerReportable interface {
-	ServerReporter(ctx context.Context, reqProtoOrNil interface{}, typ GRPCType, service string, method string) (Reporter, context.Context)
+	ServerReporter(context.Context, CallMeta) (Reporter, context.Context)
+}
+
+// CommonReportableFunc helper allows an easy way to implement reporter with common client and server logic.
+type CommonReportableFunc func(ctx context.Context, c CallMeta, isClient bool) (Reporter, context.Context)
+
+func (f CommonReportableFunc) ClientReporter(ctx context.Context, c CallMeta) (Reporter, context.Context) {
+	return f(ctx, c, true)
+}
+
+func (f CommonReportableFunc) ServerReporter(ctx context.Context, c CallMeta) (Reporter, context.Context) {
+	return f(ctx, c, false)
 }
 
 type Reporter interface {

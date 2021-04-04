@@ -5,19 +5,19 @@
 /*
 logging is a "parent" package for gRPC logging middlewares.
 
-The gRPC logging middleware populates request-scoped data to `grpc_ctxtags.Tags` that relate to the current gRPC call
-(e.g. service and method names).
+The gRPC logging middleware populates request-scoped data to `logging.Fields` that relate to the current gRPC call
+(e.g. service and method names). You can laverage that data using `logging.ExtractFields` and `logging.InjectFields`.
 
-Once the gRPC logging middleware has added the gRPC specific Tags to the ctx they will then be written with the logs
-that are made using the `ctx_logrus` or `ctx_zap` loggers.
+Once the gRPC logging middleware has added the gRPC specific Fields to the ctx they will then be written with the log lines.
 
 All logging middleware will emit a final log statement. It is based on the error returned by the handler function,
-the gRPC status code, an error (if any) and it emit at a level controlled via `WithLevels`.
+the gRPC status code, an error (if any) and it emit at a level controlled via `WithLevels`. You can control this behavior
+using `WithDecider`.
 
 This parent package
 
 This particular package is intended for use by other middleware, logging or otherwise. It contains interfaces that other
-logging middlewares *could* share . This allows code to be shared between different implementations.
+logging middlewares *could* share. This allows code to be shared between different implementations.
 
 Field names
 
@@ -31,6 +31,5 @@ Implementations:
 * providers/kit
 * providers/zerolog
 
-See relevant packages below.
 */
 package logging

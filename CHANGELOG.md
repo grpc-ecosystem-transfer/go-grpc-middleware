@@ -12,6 +12,12 @@ Types of changes:
 - `Fixed` for any bug fixes.
 - `Security` in case of vulnerabilities.
 
+## v2 
+
+### Changed 
+
+* `tags` removed. Use `logging.ExtractFields` to read logging fields from logging interceptor for your local request logger. Use `logging.InjectFields` to inject custom fields to logging interceptor to client context or interceptor before logging interceptor.
+
 ## [Unreleased]
 
 ### Added

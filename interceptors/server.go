@@ -16,7 +16,7 @@ import (
 func UnaryServerInterceptor(reportable ServerReportable) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		r := newReport(Unary, info.FullMethod)
-		reporter, newCtx := reportable.ServerReporter(ctx, req, r.rpcType, r.service, r.method)
+		reporter, newCtx := reportable.ServerReporter(ctx, CallMeta{ReqProtoOrNil: req, Typ: r.rpcType, Service: r.service, Method: r.method})
 
 		reporter.PostMsgReceive(req, nil, time.Since(r.startTime))
 		resp, err := handler(newCtx, req)
@@ -31,7 +31,7 @@ func UnaryServerInterceptor(reportable ServerReportable) grpc.UnaryServerInterce
 func StreamServerInterceptor(reportable ServerReportable) grpc.StreamServerInterceptor {
 	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		r := newReport(ServerStream, info.FullMethod)
-		reporter, newCtx := reportable.ServerReporter(ss.Context(), nil, StreamRPCType(info), r.service, r.method)
+		reporter, newCtx := reportable.ServerReporter(ss.Context(), CallMeta{ReqProtoOrNil: nil, Typ: StreamRPCType(info), Service: r.service, Method: r.method})
 		err := handler(srv, &monitoredServerStream{ServerStream: ss, newCtx: newCtx, reporter: reporter})
 		reporter.PostCall(err, time.Since(r.startTime))
 		return err

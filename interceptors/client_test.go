@@ -21,8 +21,7 @@ import (
 )
 
 type mockReport struct {
-	typ                 GRPCType
-	svcName, methodName string
+	CallMeta
 
 	postCalls       []error
 	postMsgSends    []error
@@ -40,9 +39,9 @@ type mockReportable struct {
 func (m *mockReportable) Equal(t *testing.T, expected []*mockReport) {
 	require.Len(t, expected, len(m.reports))
 	for i, e := range m.reports {
-		require.Equal(t, expected[i].typ, e.typ, "%v", i)
-		require.Equal(t, expected[i].svcName, e.svcName, "%v", i)
-		require.Equal(t, expected[i].methodName, e.methodName, "%v", i)
+		require.Equal(t, expected[i].Typ, e.Typ, "%v", i)
+		require.Equal(t, expected[i].Service, e.Service, "%v", i)
+		require.Equal(t, expected[i].Method, e.Method, "%v", i)
 
 		require.Len(t, expected[i].postCalls, len(e.postCalls), "%v", i)
 		for k, err := range e.postCalls {
@@ -111,14 +110,14 @@ func (m *mockReportable) PostMsgReceive(_ interface{}, err error, _ time.Duratio
 	m.curr.postMsgReceives = append(m.curr.postMsgReceives, err)
 }
 
-func (m *mockReportable) ClientReporter(ctx context.Context, _ interface{}, typ GRPCType, serviceName string, methodName string) (Reporter, context.Context) {
-	m.curr = &mockReport{typ: typ, svcName: serviceName, methodName: methodName}
+func (m *mockReportable) ClientReporter(ctx context.Context, c CallMeta) (Reporter, context.Context) {
+	m.curr = &mockReport{CallMeta: c}
 	m.reports = append(m.reports, m.curr)
 	return m, ctx
 }
 
-func (m *mockReportable) ServerReporter(ctx context.Context, _ interface{}, typ GRPCType, serviceName string, methodName string) (Reporter, context.Context) {
-	m.curr = &mockReport{typ: typ, svcName: serviceName, methodName: methodName}
+func (m *mockReportable) ServerReporter(ctx context.Context, c CallMeta) (Reporter, context.Context) {
+	m.curr = &mockReport{CallMeta: c}
 	m.reports = append(m.reports, m.curr)
 	return m, ctx
 }
@@ -206,9 +205,7 @@ func (s *ClientInterceptorTestSuite) TestUnaryReporting() {
 	_, err := s.testClient.PingEmpty(s.ctx, &testpb.PingEmptyRequest{}) // should return with code=OK
 	require.NoError(s.T(), err)
 	s.mock.Equal(s.T(), []*mockReport{{
-		typ:             Unary,
-		svcName:         testpb.TestServiceFullName,
-		methodName:      "PingEmpty",
+		CallMeta:        CallMeta{Typ: Unary, Service: testpb.TestServiceFullName, Method: "PingEmpty"},
 		postCalls:       []error{nil},
 		postMsgReceives: []error{nil},
 		postMsgSends:    []error{nil},
@@ -218,9 +215,7 @@ func (s *ClientInterceptorTestSuite) TestUnaryReporting() {
 	_, err = s.testClient.PingError(s.ctx, &testpb.PingErrorRequest{ErrorCodeReturned: uint32(codes.FailedPrecondition)}) // should return with code=FailedPrecondition
 	require.Error(s.T(), err)
 	s.mock.Equal(s.T(), []*mockReport{{
-		typ:             Unary,
-		svcName:         testpb.TestServiceFullName,
-		methodName:      "PingError",
+		CallMeta:        CallMeta{Typ: Unary, Service: testpb.TestServiceFullName, Method: "PingError"},
 		postCalls:       []error{status.Errorf(codes.FailedPrecondition, "Userspace error.")},
 		postMsgReceives: []error{status.Errorf(codes.FailedPrecondition, "Userspace error.")},
 		postMsgSends:    []error{nil},
@@ -233,9 +228,7 @@ func (s *ClientInterceptorTestSuite) TestStartedListReporting() {
 
 	// Even without reading, we should get initial mockReport.
 	s.mock.Equal(s.T(), []*mockReport{{
-		typ:          ServerStream,
-		svcName:      testpb.TestServiceFullName,
-		methodName:   "PingList",
+		CallMeta:     CallMeta{Typ: ServerStream, Service: testpb.TestServiceFullName, Method: "PingList"},
 		postMsgSends: []error{nil},
 	}})
 
@@ -244,14 +237,10 @@ func (s *ClientInterceptorTestSuite) TestStartedListReporting() {
 
 	// Even without reading, we should get initial mockReport.
 	s.mock.Equal(s.T(), []*mockReport{{
-		typ:          ServerStream,
-		svcName:      testpb.TestServiceFullName,
-		methodName:   "PingList",
+		CallMeta:     CallMeta{Typ: ServerStream, Service: testpb.TestServiceFullName, Method: "PingList"},
 		postMsgSends: []error{nil},
 	}, {
-		typ:          ServerStream,
-		svcName:      testpb.TestServiceFullName,
-		methodName:   "PingList",
+		CallMeta:     CallMeta{Typ: ServerStream, Service: testpb.TestServiceFullName, Method: "PingList"},
 		postMsgSends: []error{nil},
 	}})
 }
@@ -273,9 +262,7 @@ func (s *ClientInterceptorTestSuite) TestListReporting() {
 	require.EqualValues(s.T(), testpb.ListResponseCount, count, "Number of received msg on the wire must match")
 
 	s.mock.Equal(s.T(), []*mockReport{{
-		typ:             ServerStream,
-		svcName:         testpb.TestServiceFullName,
-		methodName:      "PingList",
+		CallMeta:        CallMeta{Typ: ServerStream, Service: testpb.TestServiceFullName, Method: "PingList"},
 		postCalls:       []error{io.EOF},
 		postMsgReceives: append(make([]error, testpb.ListResponseCount), io.EOF),
 		postMsgSends:    []error{nil},
@@ -298,9 +285,7 @@ func (s *ClientInterceptorTestSuite) TestListReporting() {
 	require.Equal(s.T(), codes.FailedPrecondition, st.Code(), "Recv must return FailedPrecondition, otherwise the test is wrong")
 
 	s.mock.Equal(s.T(), []*mockReport{{
-		typ:             ServerStream,
-		svcName:         testpb.TestServiceFullName,
-		methodName:      "PingList",
+		CallMeta:        CallMeta{Typ: ServerStream, Service: testpb.TestServiceFullName, Method: "PingList"},
 		postCalls:       []error{status.Errorf(codes.FailedPrecondition, "foobar"), status.Errorf(codes.FailedPrecondition, "foobar")},
 		postMsgReceives: []error{status.Errorf(codes.FailedPrecondition, "foobar"), status.Errorf(codes.FailedPrecondition, "foobar")},
 		postMsgSends:    []error{nil},
@@ -342,9 +327,7 @@ func (s *ClientInterceptorTestSuite) TestBiStreamingReporting() {
 
 	require.EqualValues(s.T(), count, 100, "Number of received msg on the wire must match")
 	s.mock.Equal(s.T(), []*mockReport{{
-		typ:             BidiStream,
-		svcName:         testpb.TestServiceFullName,
-		methodName:      "PingStream",
+		CallMeta:        CallMeta{Typ: BidiStream, Service: testpb.TestServiceFullName, Method: "PingStream"},
 		postCalls:       []error{io.EOF},
 		postMsgReceives: append(make([]error, 100), io.EOF),
 		postMsgSends:    make([]error, 100),

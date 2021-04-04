@@ -5,11 +5,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
-	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/tags"
 )
 
-func TestTagsCarrier_Set_JaegerTraceFormat(t *testing.T) {
+func TestMockedCarrier_Set_JaegerTraceFormat(t *testing.T) {
 	var (
 		fakeTraceSampled   = 1
 		fakeInboundTraceId = "deadbeef"
@@ -19,16 +17,11 @@ func TestTagsCarrier_Set_JaegerTraceFormat(t *testing.T) {
 
 	traceHeaderValue := fmt.Sprintf("%s:%s:%s:%d", fakeInboundTraceId, fakeInboundSpanId, fakeInboundSpanId, fakeTraceSampled)
 
-	c := &tagsCarrier{
-		Tags:            tags.NewTags(),
-		traceHeaderName: traceHeaderName,
-	}
-
+	c := &mockedCarrier{traceHeaderName: traceHeaderName}
 	c.Set(traceHeaderName, traceHeaderValue)
-
-	assert.EqualValues(t, map[string]string{
-		TagTraceId: fakeInboundTraceId,
-		TagSpanId:  fakeInboundSpanId,
-		TagSampled: "true",
-	}, c.Tags.Values())
+	assert.Equal(t, TraceMeta{
+		TraceID: fakeInboundTraceId,
+		SpanID:  fakeInboundSpanId,
+		Sampled: true,
+	}, c.m)
 }

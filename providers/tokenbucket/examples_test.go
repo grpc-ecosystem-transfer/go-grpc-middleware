@@ -1,9 +1,10 @@
 package tokenbucket
 
 import (
-	grpc_ratelimit "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/ratelimit"
 	"github.com/juju/ratelimit"
 	"google.golang.org/grpc"
+
+	grpc_ratelimit "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/ratelimit"
 )
 
 // Hard-coded for simplicity sake, but make this configurable in your application.

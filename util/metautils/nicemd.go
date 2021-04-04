@@ -61,7 +61,7 @@ func (m NiceMD) Clone(copiedKeys ...string) NiceMD {
 		newMd[k] = make([]string, len(vv))
 		copy(newMd[k], vv)
 	}
-	return NiceMD(newMd)
+	return newMd
 }
 
 // ToOutgoing sets the given NiceMD as a client-side context for dispatching.
@@ -71,7 +71,7 @@ func (m NiceMD) ToOutgoing(ctx context.Context) context.Context {
 
 // ToIncoming sets the given NiceMD as a server-side context for dispatching.
 //
-// This is mostly useful in ServerInterceptors..
+// This is mostly useful in ServerInterceptors.
 func (m NiceMD) ToIncoming(ctx context.Context) context.Context {
 	return metadata.NewIncomingContext(ctx, metadata.MD(m))
 }
