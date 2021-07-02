@@ -2,6 +2,7 @@ package ctxlogrus
 
 import (
 	"context"
+	"sync"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags"
 	"github.com/sirupsen/logrus"
@@ -12,6 +13,7 @@ type ctxLoggerMarker struct{}
 type ctxLogger struct {
 	logger *logrus.Entry
 	fields logrus.Fields
+	lock   sync.Mutex
 }
 
 var (
@@ -24,9 +26,12 @@ func AddFields(ctx context.Context, fields logrus.Fields) {
 	if !ok || l == nil {
 		return
 	}
+
+	l.lock.Lock()
 	for k, v := range fields {
 		l.fields[k] = v
 	}
+	l.lock.Unlock()
 }
 
 // Extract takes the call-scoped logrus.Entry from ctx_logrus middleware.
@@ -48,9 +53,11 @@ func Extract(ctx context.Context) *logrus.Entry {
 	}
 
 	// Add logrus fields added until now.
+	l.lock.Lock()
 	for k, v := range l.fields {
 		fields[k] = v
 	}
+	l.lock.Unlock()
 
 	return l.logger.WithFields(fields)
 }

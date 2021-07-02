@@ -2,6 +2,7 @@ package ctxzap
 
 import (
 	"context"
+	"sync"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags"
 	"go.uber.org/zap"
@@ -13,6 +14,7 @@ type ctxMarker struct{}
 type ctxLogger struct {
 	logger *zap.Logger
 	fields []zapcore.Field
+	lock   sync.Mutex
 }
 
 var (
@@ -26,7 +28,10 @@ func AddFields(ctx context.Context, fields ...zapcore.Field) {
 	if !ok || l == nil {
 		return
 	}
+
+	l.lock.Lock()
 	l.fields = append(l.fields, fields...)
+	l.lock.Unlock()
 }
 
 // Extract takes the call-scoped Logger from grpc_zap middleware.
@@ -39,8 +44,12 @@ func Extract(ctx context.Context) *zap.Logger {
 	}
 	// Add grpc_ctxtags tags metadata until now.
 	fields := TagsToFields(ctx)
+
 	// Add zap fields added until now.
+	l.lock.Lock()
 	fields = append(fields, l.fields...)
+	l.lock.Unlock()
+
 	return l.logger.With(fields...)
 }
 
