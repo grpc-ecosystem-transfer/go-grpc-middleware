@@ -1,28 +1,14 @@
-// Copyright 2017 Michal Witkowski. All Rights Reserved.
-// See LICENSE for licensing terms.
+package opentracing
 
-package tracing
-
-import (
-	"context"
-
-	"github.com/opentracing/opentracing-go"
-)
+import "github.com/opentracing/opentracing-go"
 
 var (
 	defaultOptions = &options{
-		filterOutFunc: nil,
-		tracer:        nil,
+		tracer: nil,
 	}
 )
 
-// FilterFunc allows users to provide a function that filters out certain methods from being traced.
-//
-// If it returns false, the given request will not be traced.
-type FilterFunc func(ctx context.Context, fullMethodName string) bool
-
 type options struct {
-	filterOutFunc   FilterFunc
 	tracer          opentracing.Tracer
 	traceHeaderName string
 }
@@ -43,13 +29,6 @@ func evaluateOptions(opts []Option) *options {
 }
 
 type Option func(*options)
-
-// WithFilterFunc customizes the function used for deciding whether a given call is traced or not.
-func WithFilterFunc(f FilterFunc) Option {
-	return func(o *options) {
-		o.filterOutFunc = f
-	}
-}
 
 // WithTraceHeaderName customizes the trace header name where trace metadata passed with requests.
 // Default one is `uber-trace-id`

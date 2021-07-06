@@ -1,7 +1,7 @@
 // Copyright 2017 Michal Witkowski. All Rights Reserved.
 // See LICENSE for licensing terms.
 
-package tracing
+package opentracing
 
 import (
 	"encoding/base64"
@@ -43,8 +43,7 @@ func (m metadataTextMap) ForeachKey(callback func(key, val string) error) error 
 func encodeKeyValue(k, v string) (string, string) {
 	k = strings.ToLower(k)
 	if strings.HasSuffix(k, binHdrSuffix) {
-		val := base64.StdEncoding.EncodeToString([]byte(v))
-		v = string(val)
+		v = base64.StdEncoding.EncodeToString([]byte(v))
 	}
 	return k, v
 }

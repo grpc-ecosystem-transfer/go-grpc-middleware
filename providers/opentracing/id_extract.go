@@ -1,4 +1,4 @@
-package tracing
+package opentracing
 
 import (
 	"strings"
@@ -41,23 +41,6 @@ type tagsCarrier struct {
 
 func (t *tagsCarrier) Set(key, val string) {
 	key = strings.ToLower(key)
-
-	if key == t.traceHeaderName {
-		parts := strings.Split(val, ":")
-		if len(parts) == 4 {
-			t.Tags.Set(TagTraceId, parts[0])
-			t.Tags.Set(TagSpanId, parts[1])
-
-			if parts[3] != jaegerNotSampledFlag {
-				t.Tags.Set(TagSampled, "true")
-			} else {
-				t.Tags.Set(TagSampled, "false")
-			}
-
-			return
-		}
-	}
-
 	if strings.Contains(key, "traceid") {
 		t.Tags.Set(TagTraceId, val) // this will most likely be base-16 (hex) encoded
 	}
@@ -70,6 +53,20 @@ func (t *tagsCarrier) Set(key, val string) {
 		switch val {
 		case "true", "false":
 			t.Tags.Set(TagSampled, val)
+		}
+	}
+
+	if key == t.traceHeaderName {
+		parts := strings.Split(val, ":")
+		if len(parts) == 4 {
+			t.Tags.Set(TagTraceId, parts[0])
+			t.Tags.Set(TagSpanId, parts[1])
+
+			if parts[3] != jaegerNotSampledFlag {
+				t.Tags.Set(TagSampled, "true")
+			} else {
+				t.Tags.Set(TagSampled, "false")
+			}
 		}
 	}
 
