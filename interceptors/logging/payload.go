@@ -9,6 +9,9 @@ import (
 	"fmt"
 	"time"
 
+	//lint:ignore SA1019 we use this deprecated package to convert pb v1 messages to pb v2
+	//nolint:staticcheck // SA1019
+	protov1 "github.com/golang/protobuf/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -30,9 +33,9 @@ func (c *serverPayloadReporter) PostMsgSend(req interface{}, err error, duration
 	}
 
 	logger := c.logger.With(extractFields(tags.Extract(c.ctx))...)
-	p, ok := req.(proto.Message)
+	p, ok := message(req)
 	if !ok {
-		logger.With("req.type", fmt.Sprintf("%T", req)).Log(ERROR, "req is not a google.golang.org/protobuf/proto.Message; programmatic error?")
+		logger.With("req.type", fmt.Sprintf("%T", req)).Log(ERROR, "req is not a protocol buffers message; programmatic error?")
 
 		return
 	}
@@ -47,9 +50,9 @@ func (c *serverPayloadReporter) PostMsgReceive(reply interface{}, err error, dur
 
 	logger := c.logger.With(extractFields(tags.Extract(c.ctx))...)
 
-	p, ok := reply.(proto.Message)
+	p, ok := message(reply)
 	if !ok {
-		logger.With("reply.type", fmt.Sprintf("%T", reply)).Log(ERROR, "reply is not a google.golang.org/protobuf/proto.Message; programmatic error?")
+		logger.With("reply.type", fmt.Sprintf("%T", reply)).Log(ERROR, "reply is not a protocol buffers message; programmatic error?")
 		return
 	}
 	// For server recv message is the request.
@@ -69,9 +72,9 @@ func (c *clientPayloadReporter) PostMsgSend(req interface{}, err error, duration
 	}
 
 	logger := c.logger.With(extractFields(tags.Extract(c.ctx))...)
-	p, ok := req.(proto.Message)
+	p, ok := message(req)
 	if !ok {
-		logger.With("req.type", fmt.Sprintf("%T", req)).Log(ERROR, "req is not a google.golang.org/protobuf/proto.Message; programmatic error?")
+		logger.With("req.type", fmt.Sprintf("%T", req)).Log(ERROR, "req is not a protocol buffers message; programmatic error?")
 		return
 	}
 	logProtoMessageAsJson(logger.With("grpc.send.duration", duration.String()), p, "grpc.request.content", "request payload logged as grpc.request.content field")
@@ -83,9 +86,9 @@ func (c *clientPayloadReporter) PostMsgReceive(reply interface{}, err error, dur
 	}
 
 	logger := c.logger.With(extractFields(tags.Extract(c.ctx))...)
-	p, ok := reply.(proto.Message)
+	p, ok := message(reply)
 	if !ok {
-		logger.With("reply.type", fmt.Sprintf("%T", reply)).Log(ERROR, "reply is not a google.golang.org/protobuf/proto.Message; programmatic error?")
+		logger.With("reply.type", fmt.Sprintf("%T", reply)).Log(ERROR, "reply is not a protocol buffers message; programmatic error?")
 		return
 	}
 	logProtoMessageAsJson(logger.With("grpc.recv.duration", duration.String()), p, "grpc.response.content", "response payload logged as grpc.response.content field")
@@ -149,6 +152,18 @@ func PayloadUnaryClientInterceptor(logger Logger, decider ClientPayloadLoggingDe
 // Logger tags will be used from tags context.
 func PayloadStreamClientInterceptor(logger Logger, decider ClientPayloadLoggingDecider, timestampFormat string) grpc.StreamClientInterceptor {
 	return interceptors.StreamClientInterceptor(&payloadReportable{logger: logger, clientDecider: decider, timestampFormat: timestampFormat})
+}
+
+func message(msg interface{}) (proto.Message, bool) {
+	pbMsg, ok := msg.(proto.Message)
+	if !ok {
+		pbV1, v1ok := msg.(protov1.Message)
+		if !v1ok {
+			return nil, false
+		}
+		pbMsg = protov1.MessageV2(pbV1)
+	}
+	return pbMsg, true
 }
 
 func logProtoMessageAsJson(logger Logger, pbMsg proto.Message, key string, msg string) {
