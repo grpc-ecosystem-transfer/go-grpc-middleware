@@ -67,15 +67,29 @@ func DefaultDeciderMethod(_ string, _ error) Decision {
 	return LogStartAndFinishCall
 }
 
+// PayloadDecision defines rules for enabling payload logging of request and responses.
+type PayloadDecision int
+
+const (
+	// NoPayloadLogging - Payload logging is disabled.
+	NoPayloadLogging PayloadDecision = iota
+	// LogRequest - Only logging of requests is enabled.
+	LogRequest
+	// LogResponse - Only logging of responses is enabled.
+	LogResponse
+	// LogRequestAndResponse - Logging of both requests and responses is enabled.
+	LogRequestAndResponse
+)
+
 // ServerPayloadLoggingDecider is a user-provided function for deciding whether to log the server-side
 // request/response payloads
-type ServerPayloadLoggingDecider func(ctx context.Context, fullMethodName string, servingObject interface{}) bool
+type ServerPayloadLoggingDecider func(ctx context.Context, fullMethodName string, servingObject interface{}) PayloadDecision
 
 // ClientPayloadLoggingDecider is a user-provided function for deciding whether to log the client-side
 // request/response payloads
-type ClientPayloadLoggingDecider func(ctx context.Context, fullMethodName string) bool
+type ClientPayloadLoggingDecider func(ctx context.Context, fullMethodName string) PayloadDecision
 
-// JsonPbMarshaller is a marshaller that serializes protobuf messages.
+// JsonPbMarshaler is a marshaller that serializes protobuf messages.
 type JsonPbMarshaler interface {
 	Marshal(pb proto.Message) ([]byte, error)
 }
