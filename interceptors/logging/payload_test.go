@@ -27,8 +27,8 @@ type loggingPayloadSuite struct {
 }
 
 func TestPayloadSuite(t *testing.T) {
-	alwaysLoggingDeciderServer := func(ctx context.Context, fullMethodName string, servingObject interface{}) bool { return true }
-	alwaysLoggingDeciderClient := func(ctx context.Context, fullMethodName string) bool { return true }
+	alwaysLoggingDeciderServer := func(context.Context, string, interface{}) logging.PayloadDecision { return logging.LogRequestAndResponse }
+	alwaysLoggingDeciderClient := func(context.Context, string) logging.PayloadDecision { return logging.LogRequestAndResponse }
 
 	s := &loggingPayloadSuite{
 		baseLoggingSuite: &baseLoggingSuite{
