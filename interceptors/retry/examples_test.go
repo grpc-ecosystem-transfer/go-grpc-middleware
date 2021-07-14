@@ -88,3 +88,8 @@ func ExampleWithPerRetryTimeout() {
 		retry.WithMax(3),
 		retry.WithPerRetryTimeout(1*time.Second))
 }
+
+// Scale duration by a factor.
+func scaleDuration(d time.Duration, factor float64) time.Duration {
+	return time.Duration(float64(d) * factor)
+}

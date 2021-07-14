@@ -429,3 +429,34 @@ func (s *ChainedRetrySuite) TestStreamWithChainedInterceptors_WithRetry() {
 	require.EqualValues(s.T(), 1, s.preRetryInterceptor.called, "pre-retry interceptor should be called once")
 	require.EqualValues(s.T(), 2, s.postRetryInterceptor.called, "post-retry interceptor should be called twice")
 }
+
+func TestJitterUp(t *testing.T) {
+	// Arguments to jitterup.
+	duration := 10 * time.Second
+	variance := 0.10
+
+	// Bound to check.
+	max := 11000 * time.Millisecond
+	min := 9000 * time.Millisecond
+	high := scaleDuration(max, 0.98)
+	low := scaleDuration(min, 1.02)
+
+	highCount := 0
+	lowCount := 0
+
+	for i := 0; i < 1000; i++ {
+		out := retry.JitterUp(duration, variance)
+		assert.True(t, out <= max, "value %s must be <= %s", out, max)
+		assert.True(t, out >= min, "value %s must be >= %s", out, min)
+
+		if out > high {
+			highCount++
+		}
+		if out < low {
+			lowCount++
+		}
+	}
+
+	assert.True(t, highCount != 0, "at least one sample should reach to >%s", high)
+	assert.True(t, lowCount != 0, "at least one sample should to <%s", low)
+}

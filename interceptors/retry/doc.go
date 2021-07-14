@@ -2,7 +2,7 @@
 // Licensed under the Apache License 2.0.
 
 /*
-`retry` provides client-side request retry logic for gRPC.
+Package retry provides client-side request retry logic for gRPC.
 
 Client-Side Request Retry Interceptor
 
