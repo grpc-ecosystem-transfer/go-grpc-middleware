@@ -15,7 +15,7 @@ func (x *PingRequest) Validate(bool) error {
 	return nil
 }
 
-func (x *PingErrorRequest) Validate(bool) error {
+func (x *PingErrorRequest) Validate() error {
 	if x.SleepTimeMs > 10000 {
 		return errors.New("cannot sleep for more than 10s")
 	}
@@ -38,6 +38,14 @@ func (x *PingStreamRequest) Validate(bool) error {
 
 // Implements the legacy validation interface from protoc-gen-validate.
 func (x *PingResponse) Validate() error {
+	if x.Counter > math.MaxInt16 {
+		return errors.New("ping allocation exceeded")
+	}
+	return nil
+}
+
+// Implements the new ValidateAll interface from protoc-gen-validate.
+func (x *PingResponse) ValidateAll() error {
 	if x.Counter > math.MaxInt16 {
 		return errors.New("ping allocation exceeded")
 	}
